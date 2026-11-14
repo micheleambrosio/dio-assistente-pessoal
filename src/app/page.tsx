@@ -24,7 +24,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
         {calendarFailed && (
           <p role="alert" className="rounded-[10px] bg-surface px-4 py-3 text-sm">
             Não conseguimos criar a agenda &quot;Contas do mês&quot; no seu Google Calendar.{" "}
-            <Link href="/login" className="font-semibold underline">Entre de novo com o Google</Link> para tentar outra vez.
+            <Link href="/login" className="font-semibold underline">Entre de novo com o Google</Link> e, na tela de consentimento, marque a permissão do Google Calendar.
           </p>
         )}
         <header className="flex items-end justify-between gap-4">

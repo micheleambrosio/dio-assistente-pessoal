@@ -14,8 +14,19 @@ async function accessTokenFor(userId: string) {
       grant_type: "refresh_token",
     }),
   });
-  if (!res.ok) throw new Error(`Falha ao renovar o token do Google (${res.status})`);
-  return (await res.json()).access_token as string;
+  if (!res.ok) throw await googleError("renovar o token", res);
+  const token = await res.json();
+  if (!String(token.scope ?? "").includes("calendar.app.created")) {
+    throw new Error(
+      "O Google não concedeu a permissão do Calendar. Entre de novo e marque a caixa do Google Calendar na tela de consentimento.",
+    );
+  }
+  return token.access_token as string;
+}
+
+async function googleError(action: string, res: Response) {
+  const body = await res.text().catch(() => "");
+  return new Error(`Falha ao ${action} no Google (${res.status}): ${body.slice(0, 500)}`);
 }
 
 const CALENDARS_URL = "https://www.googleapis.com/calendar/v3/calendars";
@@ -30,7 +41,7 @@ export class GoogleCalendarGateway implements CalendarGateway {
       },
       body: JSON.stringify({ summary: name, timeZone: "America/Sao_Paulo" }),
     });
-    if (!res.ok) throw new Error(`Falha ao criar a agenda no Google (${res.status})`);
+    if (!res.ok) throw await googleError("criar a agenda", res);
     return (await res.json()).id as string;
   }
 
@@ -39,7 +50,7 @@ export class GoogleCalendarGateway implements CalendarGateway {
       headers: { Authorization: `Bearer ${await accessTokenFor(userId)}` },
     });
     if (res.status === 404 || res.status === 410) return false;
-    if (!res.ok) throw new Error(`Falha ao consultar a agenda no Google (${res.status})`);
+    if (!res.ok) throw await googleError("consultar a agenda", res);
     return true;
   }
 
@@ -49,7 +60,7 @@ export class GoogleCalendarGateway implements CalendarGateway {
       headers: { Authorization: `Bearer ${await accessTokenFor(userId)}` },
     });
     if (!res.ok && res.status !== 404 && res.status !== 410) {
-      throw new Error(`Falha ao apagar a agenda no Google (${res.status})`);
+      throw await googleError("apagar a agenda", res);
     }
   }
 }
