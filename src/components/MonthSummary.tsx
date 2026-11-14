@@ -51,58 +51,55 @@ export function MonthSummary({ summary, occurrences }: { summary: Summary; occur
 
   const label = "text-[11px] font-semibold uppercase tracking-wide text-muted";
   const number = "text-xl font-extrabold tabular-nums text-ink sm:text-2xl";
+  const card = "flex flex-col gap-1 rounded-[22px] bg-surface p-4 text-left transition hover:brightness-95";
+  const openDrawer = () => setOpen(true);
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Resumo do mês: ver os Vencimentos do mês"
-        className="w-full rounded-[28px] bg-surface p-4 text-left transition hover:brightness-95 sm:p-5"
-      >
-        {count === 0 ? (
-          <p className="text-center text-sm font-semibold text-muted">Mês vazio</p>
-        ) : (
-          <>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-              <div>
-                <dt className={label}>Pago</dt>
-                <dd className={number}><Money value={paidTotal} /></dd>
-              </div>
-              <div>
-                <dt className={label}>A pagar</dt>
-                <dd className={number}><Money value={toPayTotal} /></dd>
-                {overdueTotal > 0 && <dd className="text-xs font-semibold text-danger">{formatMoney(overdueTotal)} em atraso</dd>}
-              </div>
-              <div>
-                <dt className={label}>Total</dt>
-                <dd className={number}><Money value={total} /></dd>
-              </div>
-              <div>
-                <dt className={label}>Progresso</dt>
-                <dd className={number}>
-                  <Count value={paidCount} /> de {count} {count === 1 ? "paga" : "pagas"}
-                </dd>
-              </div>
-            </dl>
-            <div
-              role="progressbar"
-              aria-label="Progresso do mês"
-              aria-valuemin={0}
-              aria-valuemax={count}
-              aria-valuenow={paidCount}
-              className="mt-3 h-2 overflow-hidden rounded-full bg-surface2"
-            >
-              <div className="h-full rounded-full bg-brand transition-[width] duration-700 ease-out motion-reduce:transition-none" style={{ width: `${fill * 100}%` }} />
-            </div>
-            {withoutAmountCount > 0 && (
-              <p className="mt-2 text-xs text-muted">
-                +{withoutAmountCount} {withoutAmountCount === 1 ? "conta sem valor" : "contas sem valor"}
-              </p>
-            )}
-          </>
-        )}
-      </button>
+      {count === 0 ? (
+        <button type="button" onClick={openDrawer} aria-label="Resumo do mês: ver os Vencimentos do mês" className={`${card} items-center`}>
+          <span className="text-sm font-semibold text-muted">Mês vazio</span>
+        </button>
+      ) : (
+        <section aria-label="Resumo do mês" className="flex flex-col gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+            <button type="button" onClick={openDrawer} className={card} aria-label="Pago: ver os Vencimentos do mês">
+              <span className={label}>Pago</span>
+              <span className={number}><Money value={paidTotal} /></span>
+            </button>
+            <button type="button" onClick={openDrawer} className={card} aria-label="A pagar: ver os Vencimentos do mês">
+              <span className={label}>A pagar</span>
+              <span className={number}><Money value={toPayTotal} /></span>
+              {overdueTotal > 0 && <span className="text-xs font-semibold text-danger">{formatMoney(overdueTotal)} em atraso</span>}
+            </button>
+            <button type="button" onClick={openDrawer} className={card} aria-label="Total: ver os Vencimentos do mês">
+              <span className={label}>Total</span>
+              <span className={number}><Money value={total} /></span>
+            </button>
+            <button type="button" onClick={openDrawer} className={card} aria-label="Progresso: ver os Vencimentos do mês">
+              <span className={label}>Progresso</span>
+              <span className={number}>
+                <Count value={paidCount} /> de {count} {count === 1 ? "paga" : "pagas"}
+              </span>
+              <span
+                role="progressbar"
+                aria-label="Progresso do mês"
+                aria-valuemin={0}
+                aria-valuemax={count}
+                aria-valuenow={paidCount}
+                className="mt-1 block h-2 overflow-hidden rounded-full bg-surface2"
+              >
+                <span className="block h-full rounded-full bg-brand transition-[width] duration-700 ease-out motion-reduce:transition-none" style={{ width: `${fill * 100}%` }} />
+              </span>
+            </button>
+          </div>
+          {withoutAmountCount > 0 && (
+            <p className="px-2 text-xs text-muted">
+              +{withoutAmountCount} {withoutAmountCount === 1 ? "conta sem valor" : "contas sem valor"}
+            </p>
+          )}
+        </section>
+      )}
       <Drawer title="Contas do mês" open={open} onClose={() => setOpen(false)} placement="right" width={420}>
         {occurrences.length === 0 ? (
           <p className="text-sm text-muted">Mês vazio</p>

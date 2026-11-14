@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { togglePaidAction } from "@/app/actions";
 import type { Occurrence } from "@/core/domain";
 import { RECURRENCE_LABELS, TAG_LABELS, formatDate, formatMoney } from "@/lib/labels";
 import { monthLabel } from "@/lib/month";
+import { Spinner } from "./Spinner";
 
 const ERRORS = {
   invalid_amount: "Valor inválido.",
@@ -23,6 +24,12 @@ function parseAmount(text: string): number | undefined | null {
   return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
+/**
+ * Depois de marcar/desmarcar, a linha pode trocar de lista (Atrasadas → dia) e remontar.
+ * Este recado curto faz a animação seguir o Vencimento, não a instância do componente.
+ */
+const recentChange = new Map<string, "in" | "out">();
+
 const PARTICLES = [
   [-16, -14], [0, -20], [16, -14], [20, 2], [-20, 2], [12, 16], [-12, 16],
 ] as const;
@@ -37,7 +44,15 @@ export function OccurrenceRow({ occurrence: o, highlight = false, showDate = fal
   const [asking, setAsking] = useState(false);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [celebrate, setCelebrate] = useState(false);
+  const key = o.billId + o.referenceMonth;
+  // "in": acabou de ser marcado (traço + partículas); "out": acabou de ser desmarcado.
+  const [change, setChange] = useState<"in" | "out" | null>(() => recentChange.get(key) ?? null);
+
+  useEffect(() => {
+    if (!recentChange.has(key)) return;
+    const id = setTimeout(() => recentChange.delete(key), 1500);
+    return () => clearTimeout(id);
+  }, [key, change]);
 
   const late = o.isOverdue;
   const forest = o.isPaid && highlight;
@@ -49,7 +64,8 @@ export function OccurrenceRow({ occurrence: o, highlight = false, showDate = fal
       const result = await togglePaidAction({ billId: o.billId, referenceMonth: o.referenceMonth, paid, ...(amount !== undefined && { amount }) });
       if (!result.ok) return setError(ERRORS[result.error]);
       setAsking(false);
-      setCelebrate(paid);
+      recentChange.set(key, paid ? "in" : "out");
+      setChange(paid ? "in" : "out");
       router.refresh();
     });
   }
@@ -83,16 +99,23 @@ export function OccurrenceRow({ occurrence: o, highlight = false, showDate = fal
           disabled={pending}
           aria-label={o.isPaid ? `Desmarcar ${o.title} como paga` : `Marcar ${o.title} como paga`}
           aria-expanded={o.isPaid ? undefined : asking}
-          className={`relative grid size-8 shrink-0 place-items-center rounded-full border-2 transition disabled:opacity-50 ${
-            o.isPaid ? "border-lime bg-lime" : late ? "border-[#ffb3b6] hover:bg-white/10" : "border-muted/60 hover:bg-surface2"
-          }`}
+          aria-busy={pending}
+          className={`relative grid size-8 shrink-0 place-items-center rounded-full border-2 transition-colors duration-200 ${
+            o.isPaid ? "border-lime bg-lime text-limeink" : late ? "border-[#ffb3b6] text-white hover:bg-white/10" : "border-muted/60 text-ink hover:bg-surface2"
+          } ${pending ? "cursor-progress" : ""} ${change === "in" && o.isPaid ? "check-pop" : ""}`}
         >
-          {o.isPaid && (
+          {pending ? (
+            <Spinner label={o.isPaid ? "Desmarcando" : "Marcando como paga"} className="size-4" />
+          ) : o.isPaid ? (
             <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#163300" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 12.5l4.5 4.5L19 7.5" className={celebrate ? "check-draw" : undefined} />
+              <path d="M5 12.5l4.5 4.5L19 7.5" className={change === "in" ? "check-draw" : undefined} />
             </svg>
-          )}
-          {celebrate && o.isPaid &&
+          ) : change === "out" ? (
+            <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={late ? "#ffb3b6" : "currentColor"} strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" className="check-out opacity-0">
+              <path d="M5 12.5l4.5 4.5L19 7.5" />
+            </svg>
+          ) : null}
+          {change === "in" && o.isPaid && !pending &&
             PARTICLES.map(([dx, dy], i) => (
               <i key={i} aria-hidden className="particle" style={{ "--dx": `${dx}px`, "--dy": `${dy}px` } as React.CSSProperties} />
             ))}
