@@ -17,3 +17,5 @@ Layout single-context: `GLOSSARY.md` e `docs/adr/` na raiz do repo. See `docs/ag
 ## Convenções de código
 
 Identificadores de código e objetos de banco em **inglês**. Glossário, docs, issues e textos da interface em **pt-BR**. A tradução de cada termo do glossário é fixa: see `docs/adr/0006-codigo-em-ingles-dominio-em-portugues.md`.
+
+Arquivos de componente `.tsx` usam PascalCase (`MonthCalendar.tsx`). Os arquivos especiais do Next (`page.tsx`, `layout.tsx`, `route.ts`) mantêm o nome exigido pelo framework.
