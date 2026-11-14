@@ -13,7 +13,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <h1 className="text-6xl font-black uppercase leading-none tracking-tight">Contas do mês</h1>
       <p className="text-muted">Entre com a sua conta Google para organizar o que você tem a pagar.</p>
       {message && (
-        <p role="alert" className="rounded-[10px] bg-surface px-4 py-3 text-sm">
+        <p role="alert" className="rounded-[22px] bg-surface px-4 py-3 text-sm">
           {message}
         </p>
       )}

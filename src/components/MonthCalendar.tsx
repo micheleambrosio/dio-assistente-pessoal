@@ -11,59 +11,76 @@ type Props = {
   days: Record<string, Occurrence[]>;
 };
 
+function chipStyle(o: Occurrence, dayHasOverdue: boolean) {
+  if (o.isOverdue) return "bg-danger text-white";
+  if (o.isPaid) return dayHasOverdue ? "bg-white text-[#3a3c3a] line-through" : "bg-surface2 text-muted line-through";
+  return "bg-lime text-limeink";
+}
+
+function dotStyle(o: Occurrence) {
+  if (o.isOverdue) return "bg-danger";
+  return o.isPaid ? "bg-muted/50" : "bg-brand";
+}
+
 export function MonthCalendar({ month, today, selected, days }: Props) {
   const weeks = monthWeeks(month);
 
   return (
-    <section aria-label="Calendário" className="w-full overflow-hidden rounded-[10px] border border-line">
-      <div className="grid grid-cols-7 bg-surface text-center text-xs font-semibold uppercase text-muted">
+    <section aria-label="Calendário" className="rounded-[28px] bg-surface p-3 sm:p-5">
+      <div className="grid grid-cols-7 gap-1 pb-1 text-center text-[11px] font-semibold uppercase text-muted sm:gap-1.5">
         {WEEKDAYS.map((d) => (
-          <div key={d} className="py-2">{d}</div>
+          <div key={d}>{d}</div>
         ))}
       </div>
-      {weeks.map((week, i) => (
-        <div key={i} className="grid grid-cols-7">
-          {week.map((day, j) => {
-            if (!day) return <div key={j} className="min-h-14 border-t border-l border-line first:border-l-0 sm:min-h-24" />;
-            const date = `${month}-${String(day).padStart(2, "0")}`;
-            const occurrences = days[date] ?? [];
-            const isToday = date === today;
-            return (
-              <Link
-                key={j}
-                href={`/?m=${month}&d=${date}`}
-                scroll={false}
-                aria-label={`Dia ${day}${occurrences.length ? `, ${occurrences.length} ${occurrences.length === 1 ? "Conta" : "Contas"}` : ""}`}
-                aria-current={date === selected ? "date" : undefined}
-                className={`flex min-h-14 flex-col gap-1 border-t border-l border-line p-1.5 first:border-l-0 sm:min-h-24 sm:p-2 ${date === selected ? "bg-linen text-forest" : ""}`}
+      <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+        {weeks.flat().map((day, i) => {
+          if (!day) return <div key={i} />;
+          const date = `${month}-${String(day).padStart(2, "0")}`;
+          const occurrences = days[date] ?? [];
+          const hasOverdue = occurrences.some((o) => o.isOverdue);
+          const label = occurrences.length ? `, ${occurrences.length} ${occurrences.length === 1 ? "Conta" : "Contas"}` : "";
+          return (
+            <Link
+              key={i}
+              href={`/?m=${month}&d=${date}`}
+              scroll={false}
+              aria-label={`Dia ${day}${label}`}
+              aria-current={date === selected ? "date" : undefined}
+              className={`flex min-h-[54px] flex-col gap-1 overflow-hidden rounded-xl p-1 transition sm:min-h-[104px] sm:rounded-2xl sm:p-2 ${
+                hasOverdue ? "bg-dangersoft" : "bg-bg hover:bg-soft"
+              } ${date === selected ? "ring-2 ring-brand" : ""}`}
+            >
+              <span
+                className={`grid size-6 place-items-center rounded-full text-[12px] font-bold sm:text-sm ${
+                  date === today ? "bg-brand text-bg" : "text-ink"
+                }`}
               >
-                <span
-                  className={
-                    isToday
-                      ? "inline-flex size-7 items-center justify-center rounded-full bg-lime text-sm font-semibold text-forest"
-                      : "inline-flex size-7 items-center justify-center text-sm"
-                  }
-                >
-                  {day}
-                </span>
-                {/* Desktop: até 2 chips e "+N contas". */}
-                <div className="hidden flex-col gap-1 sm:flex">
-                  {occurrences.slice(0, 2).map((o) => (
-                    <span key={o.billId + o.dueDate} className="truncate rounded bg-forest px-1.5 py-0.5 text-xs text-white">{o.title}</span>
-                  ))}
-                  {occurrences.length > 2 && <span className="text-xs text-muted">+{occurrences.length - 2} contas</span>}
-                </div>
-                {/* Mobile: pontos. */}
-                <div className="flex gap-0.5 sm:hidden" aria-hidden>
-                  {occurrences.slice(0, 4).map((o) => (
-                    <span key={o.billId + o.dueDate} className="size-1.5 rounded-full bg-forest" />
-                  ))}
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      ))}
+                {day}
+              </span>
+              {/* Desktop: até 2 chips e "+N contas". */}
+              <span className="hidden flex-col gap-0.5 sm:flex">
+                {occurrences.slice(0, 2).map((o) => (
+                  <span
+                    key={o.billId + o.dueDate}
+                    className={`truncate rounded-full px-2 py-0.5 text-[11px] font-semibold ${chipStyle(o, hasOverdue)}`}
+                  >
+                    {o.title}
+                  </span>
+                ))}
+                {occurrences.length > 2 && (
+                  <span className="px-1 text-[11px] font-bold text-ink">+{occurrences.length - 2} contas</span>
+                )}
+              </span>
+              {/* Mobile: pontos. */}
+              <span className="flex flex-wrap gap-[3px] sm:hidden" aria-hidden>
+                {occurrences.slice(0, 6).map((o) => (
+                  <i key={o.billId + o.dueDate} className={`size-1.5 rounded-full ${dotStyle(o)}`} />
+                ))}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
     </section>
   );
 }

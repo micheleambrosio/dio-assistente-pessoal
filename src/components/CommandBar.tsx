@@ -64,45 +64,62 @@ export function CommandBar() {
 
   const showingPreview = preview && !correcting;
 
+  const pill = "rounded-full px-5 py-2 text-sm font-semibold transition disabled:opacity-50";
+
   return (
-    <div className="fixed inset-x-0 bottom-0 border-t border-line bg-bg px-4 py-3">
-      <div className="mx-auto flex max-w-5xl flex-col gap-3">
-        {error && (
-          <p role="alert" className="rounded-[10px] bg-surface px-4 py-3 text-sm">{error}</p>
-        )}
-        {preview && <PreviewCard preview={preview} />}
-        {showingPreview && (
-          <div className="flex gap-2">
-            <button onClick={confirm} disabled={pending} className="rounded-full bg-lime px-5 py-2 text-sm font-semibold text-forest disabled:opacity-50">
-              Confirmar
-            </button>
-            <button onClick={() => setCorrecting(true)} disabled={pending} className="rounded-full bg-surface px-5 py-2 text-sm font-semibold disabled:opacity-50">
-              Corrigir
-            </button>
-            <button onClick={reset} disabled={pending} className="rounded-full px-5 py-2 text-sm font-semibold text-muted">
-              Descartar
-            </button>
-          </div>
-        )}
-        {(!preview || correcting) && (
-          <form onSubmit={submit} className="flex gap-2" aria-label="Comando">
-            <input
-              type="text"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              disabled={pending}
-              maxLength={500}
-              autoFocus={correcting}
-              aria-label={correcting ? "Correção" : "Comando"}
-              placeholder={correcting ? "Ex.: não, é dia 16" : "Ex.: internet Vivo, 120, todo dia 15"}
-              className="min-w-0 flex-1 rounded-full border border-line bg-surface px-5 py-3 text-ink placeholder:text-muted disabled:opacity-60"
-            />
-            <button type="submit" disabled={pending || !text.trim()} className="rounded-full bg-lime px-5 py-2 text-sm font-semibold text-forest disabled:opacity-50">
-              {pending ? "…" : "Enviar"}
-            </button>
-          </form>
-        )}
-      </div>
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-3 px-4 pb-[max(12px,env(safe-area-inset-bottom))]">
+      {error && (
+        <p role="alert" className="pointer-events-auto w-full max-w-[640px] rounded-[22px] bg-dangersoft px-4 py-3 text-sm text-danger">
+          {error}
+        </p>
+      )}
+      {preview && (
+        <div className="pointer-events-auto w-full max-w-[640px]">
+          <PreviewCard preview={preview} />
+          {showingPreview && (
+            <div className="mt-2 flex gap-2">
+              <button onClick={confirm} disabled={pending} className={`${pill} bg-lime text-limeink hover:brightness-95`}>
+                Confirmar
+              </button>
+              <button onClick={() => setCorrecting(true)} disabled={pending} className={`${pill} bg-surface2 text-ink`}>
+                Corrigir
+              </button>
+              <button onClick={reset} disabled={pending} className={`${pill} text-muted`}>
+                Descartar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      {(!preview || correcting) && (
+        <form
+          onSubmit={submit}
+          aria-label="Comando"
+          className="hairline pointer-events-auto flex w-full max-w-[640px] items-center gap-2 rounded-full bg-bg p-2 shadow-[var(--shadow-xl)]"
+        >
+          <input
+            type="text"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            disabled={pending}
+            maxLength={500}
+            autoFocus={correcting}
+            aria-label={correcting ? "Correção" : "Comando"}
+            placeholder={correcting ? "Ex.: não, é dia 16" : "Ex.: “internet Vivo, 120, todo dia 15”"}
+            className="h-12 min-w-0 flex-1 rounded-full border border-line bg-bg px-5 text-ink placeholder:text-muted focus:border-brand focus:outline-none disabled:opacity-60"
+          />
+          <button
+            type="submit"
+            disabled={pending || !text.trim()}
+            aria-label="Enviar Comando"
+            className={`grid size-10 shrink-0 place-items-center rounded-full transition ${
+              text.trim() ? "bg-lime text-limeink" : "bg-surface2 text-muted"
+            }`}
+          >
+            {pending ? "…" : "↑"}
+          </button>
+        </form>
+      )}
     </div>
   );
 }
@@ -118,13 +135,13 @@ function PreviewCard({ preview }: { preview: Preview }) {
     ["Etiquetas", preview.tags.map((t) => TAG_LABELS[t]).join(", ")],
   ];
   return (
-    <section aria-label="Prévia" className="rounded-[10px] border border-line bg-surface p-4 text-sm">
+    <section aria-label="Prévia" className="rounded-[28px] bg-surface p-4 text-sm shadow-[var(--shadow-lg)]">
       <p className="mb-2 text-muted">Você escreveu: {preview.originalText}</p>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
         {rows.map(([label, value]) => (
           <div key={label} className="contents">
             <dt className="text-muted">{label}</dt>
-            <dd className="font-semibold">{value}</dd>
+            <dd className="font-semibold text-ink">{value}</dd>
           </div>
         ))}
       </dl>
