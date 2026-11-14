@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { SaoPauloClock } from "@/core/clock";
-import { confirmPreview, correctPreview, interpretCommand } from "@/core/commands";
+import { confirmPreview, correctPreview, interpretCommand, interpretVoiceCommand } from "@/core/commands";
 import type { ConfirmResult, PreviewResult } from "@/core/commands";
 import type { Preview } from "@/core/domain";
 import { togglePaid } from "@/core/payments";
@@ -31,7 +31,7 @@ async function context() {
   };
 }
 
-export type CommandFailure = { ok: false; error: "not_understood" | "invalid_preview" | "unavailable" };
+export type CommandFailure = { ok: false; error: "not_understood" | "invalid_preview" | "invalid_audio" | "unavailable" };
 
 export async function interpretCommandAction(text: string): Promise<PreviewResult | CommandFailure> {
   const { userId, deps } = await context();
@@ -39,6 +39,22 @@ export async function interpretCommandAction(text: string): Promise<PreviewResul
     return await interpretCommand(deps, userId, text.slice(0, 500));
   } catch (e) {
     console.error("Falha ao interpretar o Comando", e);
+    return { ok: false, error: "unavailable" };
+  }
+}
+
+/** Comando falado: recebe o áudio gravado (campo `audio` do FormData). */
+export async function interpretVoiceCommandAction(form: FormData): Promise<PreviewResult | CommandFailure> {
+  const { userId, deps } = await context();
+  const file = form.get("audio");
+  if (!(file instanceof Blob)) return { ok: false, error: "invalid_audio" };
+  try {
+    const data = new Uint8Array(await file.arrayBuffer());
+    // O navegador manda "audio/webm;codecs=opus"; a IA só precisa do tipo base.
+    const mimeType = file.type.split(";")[0];
+    return await interpretVoiceCommand(deps, userId, { data, mimeType });
+  } catch (e) {
+    console.error("Falha ao interpretar o Comando de voz", e);
     return { ok: false, error: "unavailable" };
   }
 }

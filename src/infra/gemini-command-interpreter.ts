@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { TAGS } from "@/core/domain";
-import type { Draft } from "@/core/domain";
+import type { AudioInput, Draft } from "@/core/domain";
 import type { CommandInterpreter } from "@/core/ports";
 
 const MODEL = process.env.GEMINI_MODEL ?? "gemini-3.8-flash";
@@ -33,11 +33,33 @@ Regras:
 - Não invente valor: omita amount se não foi dito.
 - Se o texto não for um cadastro de Conta, devolva understood=false.`;
 
+const AUDIO_SCHEMA = {
+  ...RESPONSE_SCHEMA,
+  properties: {
+    transcript: { type: "string", description: "Transcrição fiel do que o Usuário falou, em português do Brasil" },
+    ...RESPONSE_SCHEMA.properties,
+  },
+  required: ["transcript", ...RESPONSE_SCHEMA.required],
+} as const;
+
 export class GeminiCommandInterpreter implements CommandInterpreter {
   private readonly ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
   interpret(text: string, today: string) {
     return this.generate(`Hoje é ${today}.\nComando: ${text}`);
+  }
+
+  async interpretAudio(audio: AudioInput, today: string) {
+    const raw = await this.generateRaw(
+      [
+        { text: `Hoje é ${today}.\nTranscreva o áudio com o Comando do Usuário e interprete-o.` },
+        { inlineData: { mimeType: audio.mimeType, data: Buffer.from(audio.data).toString("base64") } },
+      ],
+      AUDIO_SCHEMA,
+    );
+    if (!raw || typeof raw.transcript !== "string") return null;
+    const { transcript, ...fields } = raw;
+    return { draft: toDraft(fields), transcript };
   }
 
   correct(previous: Draft, correction: string, today: string) {
@@ -48,13 +70,22 @@ export class GeminiCommandInterpreter implements CommandInterpreter {
   }
 
   private async generate(contents: string): Promise<Draft | null> {
+    const raw = await this.generateRaw(contents, RESPONSE_SCHEMA);
+    return raw ? toDraft(raw) : null;
+  }
+
+  /** Devolve o JSON da IA, ou null se não for JSON ou `understood` não for true. */
+  private async generateRaw(
+    contents: string | { text?: string; inlineData?: { mimeType: string; data: string } }[],
+    schema: object,
+  ): Promise<Record<string, unknown> | null> {
     const response = await this.ai.models.generateContent({
       model: MODEL,
-      contents,
+      contents: typeof contents === "string" ? contents : [{ role: "user", parts: contents }],
       config: {
         systemInstruction: INSTRUCTIONS,
         responseMimeType: "application/json",
-        responseJsonSchema: RESPONSE_SCHEMA,
+        responseJsonSchema: schema,
       },
     });
 
@@ -65,9 +96,12 @@ export class GeminiCommandInterpreter implements CommandInterpreter {
       return null;
     }
     if (typeof raw !== "object" || raw === null || (raw as { understood?: unknown }).understood !== true) return null;
-
-    // A IA devolve null nos campos ausentes; o núcleo valida o resto.
-    const { understood: _understood, ...fields } = raw as Record<string, unknown>;
-    return Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== null)) as unknown as Draft;
+    return raw as Record<string, unknown>;
   }
+}
+
+/** A IA devolve null nos campos ausentes; o núcleo valida o resto. */
+function toDraft(raw: Record<string, unknown>): Draft {
+  const { understood: _understood, ...fields } = raw;
+  return Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== null)) as unknown as Draft;
 }

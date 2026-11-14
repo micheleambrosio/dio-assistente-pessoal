@@ -84,10 +84,19 @@ export type Draft = {
   tags: Tag[];
 };
 
+/** Áudio gravado de um Comando falado, enviado inline à IA. */
+export type AudioInput = {
+  data: Uint8Array;
+  /** Ex.: `audio/webm`. */
+  mimeType: string;
+};
+
 /** O que a IA entendeu de um Comando, para o Usuário confirmar ou corrigir. Não é persistida. */
 export type Preview = Draft & {
   action: "create_bill";
-  /** O texto do Comando, mostrado como "Você escreveu: …". */
+  /** "voice" quando o Comando foi falado; ausente no Comando escrito. */
+  source?: "voice";
+  /** O texto do Comando (ou a transcrição, se falado), mostrado como "Você escreveu/disse: …". */
   originalText: string;
   /** Primeira Data de vencimento, derivada do Draft (só para exibição). */
   startDate: string;

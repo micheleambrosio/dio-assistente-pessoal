@@ -2,14 +2,16 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { confirmPreviewAction, correctPreviewAction, interpretCommandAction } from "@/app/actions";
+import { confirmPreviewAction, correctPreviewAction, interpretCommandAction, interpretVoiceCommandAction } from "@/app/actions";
 import type { Preview } from "@/core/domain";
 import { Spinner } from "./Spinner";
+import { VoiceRecorder } from "./VoiceRecorder";
 import { RECURRENCE_LABELS, TAG_LABELS, formatDate, formatMoney } from "@/lib/labels";
 
 const ERRORS = {
   not_understood: "Não entendi o Comando. Tente algo como “internet Vivo, 120, todo dia 15”.",
   invalid_preview: "Essa Prévia não é mais válida. Escreva o Comando de novo.",
+  invalid_audio: "Não consegui usar essa gravação. Tente falar de novo, por até 30 segundos.",
   unavailable: "Não consegui falar com o assistente agora. Tente de novo em instantes.",
 } as const;
 
@@ -22,6 +24,7 @@ export function CommandBar() {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [busyLabel, setBusyLabel] = useState("");
+  const [recording, setRecording] = useState(false);
 
   function show(result: Awaited<ReturnType<typeof interpretCommandAction>>) {
     if (result.ok) {
@@ -53,6 +56,20 @@ export function CommandBar() {
       }
       setText("");
     });
+  }
+
+  function sendRecording(audio: Blob) {
+    setRecording(false);
+    setBusyLabel("Ouvindo e entendendo o Comando…");
+    const form = new FormData();
+    form.set("audio", audio);
+    startTransition(async () => show(await interpretVoiceCommandAction(form)));
+  }
+
+  function cancelRecording(reason?: "denied" | "unsupported") {
+    setRecording(false);
+    if (reason === "denied") setError("Não consegui acessar o microfone. Libere a permissão no navegador e tente de novo.");
+    if (reason === "unsupported") setError("Este navegador não grava áudio. Escreva o Comando.");
   }
 
   function confirm() {
@@ -101,7 +118,8 @@ export function CommandBar() {
           )}
         </div>
       )}
-      {(!preview || correcting) && (
+      {recording && <VoiceRecorder onRecorded={sendRecording} onCancel={cancelRecording} />}
+      {(!preview || correcting) && !recording && (
         <form
           onSubmit={submit}
           aria-label="Comando"
@@ -118,16 +136,32 @@ export function CommandBar() {
             placeholder={correcting ? "Ex.: não, é dia 16" : "Ex.: “internet Vivo, 120, todo dia 15”"}
             className="h-12 min-w-0 flex-1 rounded-full border border-line bg-bg px-5 text-ink placeholder:text-muted focus:border-brand focus:outline-none disabled:opacity-60"
           />
-          <button
-            type="submit"
-            disabled={pending || !text.trim()}
-            aria-label="Enviar Comando"
-            className={`grid size-10 shrink-0 place-items-center rounded-full transition ${
-              text.trim() ? "bg-lime text-limeink" : "bg-surface2 text-muted"
-            }`}
-          >
-            {pending ? <Spinner label="Enviando" /> : "↑"}
-          </button>
+          {!correcting && !text.trim() && (
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setRecording(true);
+              }}
+              disabled={pending}
+              aria-label="Gravar Comando por voz"
+              className="grid size-10 shrink-0 place-items-center rounded-full bg-surface2 text-ink transition hover:brightness-95 disabled:opacity-50"
+            >
+              <MicIcon />
+            </button>
+          )}
+          {(text.trim() || correcting || pending) && (
+            <button
+              type="submit"
+              disabled={pending || !text.trim()}
+              aria-label="Enviar Comando"
+              className={`grid size-10 shrink-0 place-items-center rounded-full transition ${
+                text.trim() ? "bg-lime text-limeink" : "bg-surface2 text-muted"
+              }`}
+            >
+              {pending ? <Spinner label="Enviando" /> : "↑"}
+            </button>
+          )}
         </form>
       )}
     </div>
@@ -146,7 +180,9 @@ function PreviewCard({ preview }: { preview: Preview }) {
   ];
   return (
     <section aria-label="Prévia" className="rounded-[28px] bg-surface p-4 text-sm shadow-[var(--shadow-lg)]">
-      <p className="mb-2 text-muted">Você escreveu: {preview.originalText}</p>
+      <p className="mb-2 text-muted">
+        {preview.source === "voice" ? "Você disse" : "Você escreveu"}: {preview.originalText}
+      </p>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
         {rows.map(([label, value]) => (
           <div key={label} className="contents">
@@ -156,5 +192,14 @@ function PreviewCard({ preview }: { preview: Preview }) {
         ))}
       </dl>
     </section>
+  );
+}
+
+function MicIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="3" width="6" height="12" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+    </svg>
   );
 }
