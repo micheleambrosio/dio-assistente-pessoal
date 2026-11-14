@@ -32,8 +32,13 @@ export function VoiceRecorder({ onRecorded, onCancel }: Props) {
       finished = true;
       send = shouldSend;
       clearInterval(timer);
-      if (recorder && recorder.state !== "inactive") recorder.stop();
-      else stream?.getTracks().forEach((t) => t.stop());
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+        return;
+      }
+      stream?.getTracks().forEach((t) => t.stop());
+      // Ainda não há gravação (o microfone não foi liberado): não há o que enviar, então o painel fecha.
+      if (shouldSend) callbacks.current.onCancel();
     }
     stopRef.current = stop;
 
@@ -63,6 +68,8 @@ export function VoiceRecorder({ onRecorded, onCancel }: Props) {
         }, 250);
       })
       .catch(() => {
+        // Já cancelado ou desmontado: o erro de permissão não interessa mais.
+        if (finished) return;
         finished = true;
         callbacks.current.onCancel("denied");
       });
