@@ -151,6 +151,15 @@ export function MonthSummary({ summary, occurrences }: { summary: Summary; occur
 
 /** Os mesmos cartões da lista do dia, com o check: dá para marcar e desmarcar daqui. */
 function DrawerList({ title, items, empty }: { title: string; items: Occurrence[]; empty: string }) {
+  // Mesma regra da lista do dia: o primeiro Pago de cada dia ganha o cartão forest.
+  const firstPaidOfDay = new Set<string>();
+  const highlighted = new Set<Occurrence>();
+  for (const o of items) {
+    if (o.isPaid && !firstPaidOfDay.has(o.effectiveDate)) {
+      firstPaidOfDay.add(o.effectiveDate);
+      highlighted.add(o);
+    }
+  }
   return (
     <section aria-label={title}>
       <h4 className="mb-2 text-sm font-bold text-ink">{title} · {items.length}</h4>
@@ -159,7 +168,7 @@ function DrawerList({ title, items, empty }: { title: string; items: Occurrence[
       ) : (
         <ul className="flex flex-col gap-2">
           {items.map((o) => (
-            <OccurrenceRow key={o.billId + o.referenceMonth} occurrence={o} showDate />
+            <OccurrenceRow key={o.billId + o.referenceMonth} occurrence={o} showDate highlight={highlighted.has(o)} />
           ))}
         </ul>
       )}
