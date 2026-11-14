@@ -62,7 +62,7 @@ async function MonthBody({ month, day, clock }: { month: string; day?: string; c
       {view && <MonthSummary summary={view.summary} occurrences={view.referenceOccurrences} />}
       <MonthCalendar month={month} today={today} selected={selected} days={days} />
       {/* Atrasadas é global e fica ao lado do dia (desktop) ou acima dele (mobile). */}
-      <div className={`mt-1 grid items-start gap-6 ${view?.overdue.length ? "lg:grid-cols-2" : ""}`}>
+      <div className={`mt-1 grid grid-cols-[minmax(0,1fr)] items-start gap-6 ${view?.overdue.length ? "lg:grid-cols-2" : ""}`}>
         <OverdueTimeline occurrences={view?.overdue ?? []} />
         <DayTimeline date={selected} today={today} occurrences={days[selected] ?? []} />
       </div>

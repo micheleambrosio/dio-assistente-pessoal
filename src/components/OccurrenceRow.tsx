@@ -28,10 +28,10 @@ const PARTICLES = Array.from({ length: 8 }, (_, i) => [
 ]);
 
 /**
- * Um Vencimento na lista. `highlight` marca o primeiro Pago do dia (cartão forest).
+ * Um Vencimento na lista. Todo Pago fica em cartão forest.
  * O check só alterna o status. O valor da Conta se edita (ou não) pelo lápis ao lado dele.
  */
-export function OccurrenceRow({ occurrence: o, highlight = false, showDate = false }: { occurrence: Occurrence; highlight?: boolean; showDate?: boolean }) {
+export function OccurrenceRow({ occurrence: o, showDate = false }: { occurrence: Occurrence; showDate?: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
@@ -49,7 +49,7 @@ export function OccurrenceRow({ occurrence: o, highlight = false, showDate = fal
   }, [key, change]);
 
   const late = o.isOverdue;
-  const forest = o.isPaid && highlight;
+  const forest = o.isPaid;
   const refMonth = o.effectiveDate.slice(0, 7);
 
   function submit(kind: "status" | "amount", paid: boolean, amount?: number) {
@@ -80,7 +80,9 @@ export function OccurrenceRow({ occurrence: o, highlight = false, showDate = fal
     setEditing((value) => !value);
   }
 
-  function saveAmount(e: React.FormEvent) {
+  function onAmountKey(e: React.KeyboardEvent) {
+    if (e.key === "Escape") return setEditing(false);
+    if (e.key !== "Enter" || pending) return;
     e.preventDefault();
     const amount = unmaskMoney(text);
     if (amount === undefined || amount === o.amount) return setEditing(false); // nada a mudar
@@ -150,8 +152,20 @@ export function OccurrenceRow({ occurrence: o, highlight = false, showDate = fal
             {showDate && <span className={`text-[11px] ${onDark ? "text-white/70" : "text-muted"}`}>vence {formatDate(o.effectiveDate).slice(0, 5)}</span>}
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          {o.amount !== undefined ? (
+        <div className="flex shrink-0 items-center gap-1.5">
+          {editing ? (
+            <input
+              inputMode="numeric"
+              value={text}
+              onChange={(e) => setText(maskMoney(e.target.value))}
+              onKeyDown={onAmountKey}
+              disabled={saving === "amount"}
+              autoFocus
+              aria-label={`Valor de ${o.title} (Enter salva, Esc cancela)`}
+              placeholder="R$ 0,00"
+              className="h-8 w-28 rounded-full border border-line bg-bg px-3 text-right text-sm font-bold tabular-nums text-ink focus:border-brand focus:outline-none disabled:opacity-60 sm:w-32"
+            />
+          ) : o.amount !== undefined ? (
             <span className={`text-[15px] font-bold tabular-nums ${onDark ? "text-white" : "text-ink"}`}>{formatMoney(o.amount)}</span>
           ) : (
             <span title="Sem valor: entra na contagem, não nos totais." className={`rounded-full border border-dashed px-2 py-0.5 text-[11px] ${onDark ? "border-white/60 text-white/80" : "border-muted text-muted"}`}>
@@ -161,39 +175,25 @@ export function OccurrenceRow({ occurrence: o, highlight = false, showDate = fal
           <button
             type="button"
             onClick={startEditing}
-            aria-label={`Editar o valor de ${o.title}`}
-            aria-expanded={editing}
-            title="Editar o valor"
+            disabled={saving === "amount"}
+            aria-label={editing ? `Cancelar a edição do valor de ${o.title}` : `Editar o valor de ${o.title}`}
+            title={editing ? "Cancelar" : "Editar o valor"}
             className={`grid size-7 shrink-0 place-items-center rounded-full transition ${onDark ? "text-white/80 hover:bg-white/15" : "text-muted hover:bg-surface2 hover:text-ink"}`}
           >
-            <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-            </svg>
+            {saving === "amount" ? (
+              <Spinner label="Salvando o valor" className="size-3.5" />
+            ) : editing ? (
+              <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            ) : (
+              <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+              </svg>
+            )}
           </button>
         </div>
       </div>
-      {editing && (
-        <form onSubmit={saveAmount} className="mt-3 flex flex-wrap items-center gap-2 pl-11">
-          <label className={`text-sm ${late ? "text-white" : "text-body"}`} htmlFor={`paid-${o.billId}-${o.referenceMonth}`}>
-            Valor da Conta
-          </label>
-          <input
-            id={`paid-${o.billId}-${o.referenceMonth}`}
-            inputMode="decimal"
-            value={text}
-            onChange={(e) => setText(maskMoney(e.target.value))}
-            autoFocus
-            placeholder="R$ 0,00"
-            className="h-9 w-36 rounded-full border border-line bg-bg px-4 text-sm text-ink focus:border-brand focus:outline-none"
-          />
-          <button type="submit" disabled={pending} className="h-9 rounded-full bg-lime px-4 text-sm font-semibold text-limeink disabled:opacity-50">
-            {saving === "amount" ? "Salvando…" : "Salvar valor"}
-          </button>
-          <button type="button" onClick={() => setEditing(false)} disabled={pending} className={`h-9 px-2 text-sm ${late ? "text-white/80" : "text-muted"}`}>
-            Cancelar
-          </button>
-        </form>
-      )}
       {error && (
         <p role="alert" className={`mt-2 pl-11 text-sm ${late ? "text-white" : "text-danger"}`}>
           {error}
