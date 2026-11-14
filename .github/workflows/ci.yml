@@ -7,7 +7,7 @@ on:
 
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # o Playwright 1.56 não suporta o Ubuntu 26.04 do ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
