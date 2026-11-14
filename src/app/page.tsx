@@ -4,6 +4,7 @@ import { AccountMenu } from "@/components/AccountMenu";
 import { CommandBar } from "@/components/CommandBar";
 import { DayTimeline } from "@/components/DayTimeline";
 import { MonthCalendar } from "@/components/MonthCalendar";
+import { NavigationProvider } from "@/components/NavigationProvider";
 import { MonthNav } from "@/components/MonthNav";
 import { MonthSkeleton } from "@/components/MonthSkeleton";
 import { PendingRemindersNotice } from "@/components/PendingRemindersNotice";
@@ -25,7 +26,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
   const { name, year } = monthLabel(month);
 
   return (
-    <>
+    <NavigationProvider>
       <main className="mx-auto flex min-h-dvh max-w-[1200px] flex-col gap-4 px-4 pt-14 pb-44 sm:px-6">
         {/* Falar com o Google demora: os avisos chegam depois, sem segurar o mês. */}
         <Suspense fallback={null}>
@@ -45,7 +46,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
         </Suspense>
       </main>
       <CommandBar />
-    </>
+    </NavigationProvider>
   );
 }
 
