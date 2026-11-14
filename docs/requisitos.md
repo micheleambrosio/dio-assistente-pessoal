@@ -48,7 +48,7 @@ Next.js, TypeScript, Supabase, Tailwind, Ant Design, Google Gemini (extração e
 
 - **Valor da Conta** é o padrão (opcional). **Valor do Vencimento** substitui o padrão naquele mês e pode ser informado pela entrada em linguagem natural ("a energia de novembro deu 187,40", com Prévia) ou num campo opcional "valor pago" no check. Mudar o valor atualiza o título do Lembrete.
 - O check marca o Vencimento como **Pago**.
-- **Atrasado** (calculado): não Pago e com a Data efetiva no passado. Aparece no topo da lista do dia, num bloco "Atrasadas", até receber o check, e tem destaque próprio no Calendário.
+- **Atrasado** (calculado): não Pago e com a Data efetiva no passado. Aparece num bloco **global** "Atrasadas" (independente do mês aberto) até receber o check, e tem destaque próprio no Calendário.
 - Ao marcar como Pago, o Lembrete ganha "✅" no título e perde a notificação. Ao desmarcar, o título volta ao original e a notificação é recriada (se a Data efetiva ainda não passou).
 - Fora do MVP: multa e juros, e "pago com atraso" como estado separado.
 
@@ -71,4 +71,5 @@ Next.js, TypeScript, Supabase, Tailwind, Ant Design, Google Gemini (extração e
 - Dá para navegar para meses anteriores ao cadastro do Usuário e para meses futuros.
 - **Resumo do mês**, ligado ao mês aberto no Calendário e calculado pelo Mês de referência: Pago, A pagar (com os Atrasados em destaque), Total e progresso ("8 de 12 pagas"). Vencimentos sem valor entram na contagem e não nos totais ("+2 contas sem valor"). Ao tocar no resumo, aparecem todos os Vencimentos do mês, separados em pagos e a pagar.
 - Fora do MVP: gráficos por Etiqueta e comparação entre meses.
-- Responsiva, com light mode e dark mode. O layout ainda está em aberto (será definido com protótipo).
+- Responsiva, com light mode e dark mode.
+- Layout, estilos e critérios de aceite da UI: [design/tela-principal.md](design/tela-principal.md) (variação B "Agenda" do protótipo).
