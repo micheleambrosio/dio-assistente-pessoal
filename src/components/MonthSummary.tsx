@@ -59,7 +59,7 @@ export function MonthSummary({ summary, occurrences }: { summary: Summary; occur
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  const tile = "flex flex-col rounded-[24px] p-4 text-left transition duration-200 hover:-translate-y-[3px] active:scale-[0.97] motion-reduce:transition-none";
+  const tile = "cursor-pointer flex flex-col rounded-[24px] p-4 text-left transition duration-200 hover:-translate-y-[3px] active:scale-[0.97] motion-reduce:transition-none";
   const caption = "text-xs font-semibold opacity-70";
   const value = "mt-1 text-xl font-extrabold tabular-nums sm:text-2xl";
   const openDrawer = () => setOpen(true);

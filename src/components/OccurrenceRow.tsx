@@ -38,12 +38,13 @@ const PARTICLES = Array.from({ length: 8 }, (_, i) => [
 
 /**
  * Um Vencimento na lista. `highlight` marca o primeiro Pago do dia (cartão forest).
- * Dar o check num Vencimento aberto pede o valor pago (opcional); no Pago, o check desmarca.
+ * O check só alterna o status. O valor da Conta se edita (ou não) pelo lápis ao lado dele.
  */
 export function OccurrenceRow({ occurrence: o, highlight = false, showDate = false }: { occurrence: Occurrence; highlight?: boolean; showDate?: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [asking, setAsking] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState<"status" | "amount" | null>(null);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const key = o.billId + o.referenceMonth;
@@ -60,31 +61,40 @@ export function OccurrenceRow({ occurrence: o, highlight = false, showDate = fal
   const forest = o.isPaid && highlight;
   const refMonth = o.effectiveDate.slice(0, 7);
 
-  function submit(paid: boolean, amount?: number) {
+  function submit(kind: "status" | "amount", paid: boolean, amount?: number) {
     setError(null);
+    setSaving(kind);
     startTransition(async () => {
       const result = await togglePaidAction({ billId: o.billId, referenceMonth: o.referenceMonth, paid, ...(amount !== undefined && { amount }) });
+      setSaving(null);
       if (!result.ok) return setError(ERRORS[result.error]);
-      setAsking(false);
-      recentChange.set(key, paid ? "in" : "out");
-      setChange(paid ? "in" : "out");
+      if (kind === "status") {
+        recentChange.set(key, paid ? "in" : "out");
+        setChange(paid ? "in" : "out");
+      } else {
+        setEditing(false);
+      }
       router.refresh();
     });
   }
 
   function onCheck() {
     if (pending) return;
-    if (o.isPaid) return submit(false);
-    setText(o.amount !== undefined ? String(o.amount).replace(".", ",") : "");
-    setError(null);
-    setAsking((value) => !value);
+    submit("status", !o.isPaid);
   }
 
-  function confirmPaid(e: React.FormEvent) {
+  function startEditing() {
+    setText(o.amount !== undefined ? String(o.amount).replace(".", ",") : "");
+    setError(null);
+    setEditing((value) => !value);
+  }
+
+  function saveAmount(e: React.FormEvent) {
     e.preventDefault();
     const amount = parseAmount(text);
     if (amount === null) return setError(ERRORS.invalid_amount);
-    submit(true, amount);
+    if (amount === undefined || amount === o.amount) return setEditing(false); // nada a mudar
+    submit("amount", o.isPaid, amount); // mantém o status; só o valor muda
   }
 
   const pill = (extra: string) => `rounded-full px-2 py-0.5 text-[11px] font-medium ${extra}`;
@@ -100,14 +110,13 @@ export function OccurrenceRow({ occurrence: o, highlight = false, showDate = fal
           onClick={onCheck}
           disabled={pending}
           aria-label={o.isPaid ? `Desmarcar ${o.title} como paga` : `Marcar ${o.title} como paga`}
-          aria-expanded={o.isPaid ? undefined : asking}
           aria-busy={pending}
           aria-pressed={o.isPaid}
           className={`relative grid size-8 shrink-0 place-items-center rounded-full border-2 transition duration-200 hover:scale-110 active:scale-90 ${
             o.isPaid ? "border-lime bg-lime text-limeink" : late ? "border-[#ffb3b6] text-white hover:bg-white/10" : "border-muted/60 text-ink hover:bg-surface2"
-          } ${pending ? "cursor-progress" : ""} ${change === "in" && o.isPaid ? "check-pop" : ""}`}
+          } ${saving === "status" ? "cursor-progress" : ""} ${change === "in" && o.isPaid ? "check-pop" : ""}`}
         >
-          {pending ? (
+          {saving === "status" ? (
             <Spinner label={o.isPaid ? "Desmarcando" : "Marcando como paga"} className="size-4" />
           ) : o.isPaid ? (
             <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#163300" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round">
@@ -118,7 +127,7 @@ export function OccurrenceRow({ occurrence: o, highlight = false, showDate = fal
               <path d="M5 12.5l4.5 4.5L19 7.5" />
             </svg>
           ) : null}
-          {change === "in" && o.isPaid && !pending &&
+          {change === "in" && o.isPaid && saving !== "status" &&
             PARTICLES.map(([dx, dy], i) => (
               <i key={i} aria-hidden className="particle" style={{ "--dx": `${dx}px`, "--dy": `${dy}px` } as React.CSSProperties} />
             ))}
@@ -151,18 +160,32 @@ export function OccurrenceRow({ occurrence: o, highlight = false, showDate = fal
             {showDate && <span className={`text-[11px] ${onDark ? "text-white/70" : "text-muted"}`}>vence {formatDate(o.effectiveDate).slice(0, 5)}</span>}
           </div>
         </div>
-        {o.amount !== undefined ? (
-          <span className={`text-[15px] font-bold tabular-nums ${onDark ? "text-white" : "text-ink"}`}>{formatMoney(o.amount)}</span>
-        ) : (
-          <span title="Sem valor: entra na contagem, não nos totais." className={`rounded-full border border-dashed px-2 py-0.5 text-[11px] ${onDark ? "border-white/60 text-white/80" : "border-muted text-muted"}`}>
-            sem valor
-          </span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {o.amount !== undefined ? (
+            <span className={`text-[15px] font-bold tabular-nums ${onDark ? "text-white" : "text-ink"}`}>{formatMoney(o.amount)}</span>
+          ) : (
+            <span title="Sem valor: entra na contagem, não nos totais." className={`rounded-full border border-dashed px-2 py-0.5 text-[11px] ${onDark ? "border-white/60 text-white/80" : "border-muted text-muted"}`}>
+              sem valor
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={startEditing}
+            aria-label={`Editar o valor de ${o.title}`}
+            aria-expanded={editing}
+            title="Editar o valor"
+            className={`grid size-7 shrink-0 place-items-center rounded-full transition ${onDark ? "text-white/80 hover:bg-white/15" : "text-muted hover:bg-surface2 hover:text-ink"}`}
+          >
+            <svg aria-hidden width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
+          </button>
+        </div>
       </div>
-      {asking && (
-        <form onSubmit={confirmPaid} className="mt-3 flex flex-wrap items-center gap-2 pl-11">
+      {editing && (
+        <form onSubmit={saveAmount} className="mt-3 flex flex-wrap items-center gap-2 pl-11">
           <label className={`text-sm ${late ? "text-white" : "text-body"}`} htmlFor={`paid-${o.billId}-${o.referenceMonth}`}>
-            Valor pago (opcional)
+            Valor da Conta
           </label>
           <input
             id={`paid-${o.billId}-${o.referenceMonth}`}
@@ -174,9 +197,9 @@ export function OccurrenceRow({ occurrence: o, highlight = false, showDate = fal
             className="h-9 w-32 rounded-full border border-line bg-bg px-4 text-sm text-ink focus:border-brand focus:outline-none"
           />
           <button type="submit" disabled={pending} className="h-9 rounded-full bg-lime px-4 text-sm font-semibold text-limeink disabled:opacity-50">
-            {pending ? "Salvando…" : "Marcar como paga"}
+            {saving === "amount" ? "Salvando…" : "Salvar valor"}
           </button>
-          <button type="button" onClick={() => setAsking(false)} disabled={pending} className={`h-9 px-2 text-sm ${late ? "text-white/80" : "text-muted"}`}>
+          <button type="button" onClick={() => setEditing(false)} disabled={pending} className={`h-9 px-2 text-sm ${late ? "text-white/80" : "text-muted"}`}>
             Cancelar
           </button>
         </form>

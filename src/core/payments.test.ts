@@ -56,6 +56,17 @@ describe("togglePaid", () => {
     expect((await dayOf(deps, "2025-02", "2025-02-17"))[0].amount).toBe(120);
   });
 
+  it("editar só o valor não muda o status do Vencimento", async () => {
+    const { deps } = setup("2025-01-10");
+    const billId = await register(deps, monthly);
+
+    await togglePaid(deps, USER, { billId, referenceMonth: "2025-01", paid: false, amount: 150 });
+    expect((await dayOf(deps, "2025-01", "2025-01-15"))[0]).toMatchObject({ isPaid: false, amount: 150 });
+
+    await togglePaid(deps, USER, { billId, referenceMonth: "2025-01", paid: true });
+    expect((await dayOf(deps, "2025-01", "2025-01-15"))[0]).toMatchObject({ isPaid: true, amount: 150 });
+  });
+
   it("dá um valor a um Vencimento que não tinha", async () => {
     const { deps } = setup("2025-01-10");
     const billId = await register(deps, { ...monthly, amount: undefined });

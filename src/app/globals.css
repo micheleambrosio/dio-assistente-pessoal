@@ -170,3 +170,11 @@ body {
     display: none;
   }
 }
+
+/* Tudo que é botão e está ativo mostra a mãozinha (o Tailwind 4 deixa o cursor padrão). */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
