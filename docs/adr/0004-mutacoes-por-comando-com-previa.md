@@ -1,0 +1,3 @@
+# Contas são criadas e alteradas por Comando em linguagem natural com Prévia, não por formulários
+
+Não há formulários de CRUD. Cadastrar, editar, encerrar, informar valor e marcar como Pago são feitos por um Comando, escrito ou falado. O Gemini interpreta a intenção e os dados, e mostra uma Prévia que o Usuário confirma ou corrige, também em linguagem natural. Nada é salvo e nenhum Lembrete é criado antes da confirmação, porque transcrição e extração podem errar em sequência. Exceções deliberadas: o check do Vencimento e os botões Encerrar e Excluir na interface. Excluir só existe na interface, porque é destrutivo.
