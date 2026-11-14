@@ -1,20 +1,25 @@
 import Link from "next/link";
 import { CommandBar } from "@/components/CommandBar";
+import { DayTimeline } from "@/components/DayTimeline";
 import { MonthCalendar } from "@/components/MonthCalendar";
 import { SaoPauloClock } from "@/core/clock";
+import { getMonth } from "@/core/commands";
 import { ensureBillsCalendar } from "@/core/ensure-bills-calendar";
 import { GoogleCalendarGateway } from "@/infra/google-calendar-gateway";
 import { createUserClient } from "@/infra/supabase";
 import { SupabaseRepository } from "@/infra/supabase-repository";
 import { isMonth, monthLabel, shiftMonth } from "@/lib/month";
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ m?: string }> }) {
+export default async function Home({ searchParams }: { searchParams: Promise<{ m?: string; d?: string }> }) {
   const clock = new SaoPauloClock();
-  const { m } = await searchParams;
+  const { m, d } = await searchParams;
   const month = isMonth(m) ? m : clock.currentMonth();
   const { name, year } = monthLabel(month);
 
   const calendarFailed = await retryMissingBillsCalendar();
+  const days = await loadMonth(month, clock);
+  const today = clock.today();
+  const selected = d?.startsWith(month) && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : today.startsWith(month) ? today : `${month}-01`;
 
   const nav = "inline-flex size-10 items-center justify-center rounded-full bg-surface font-semibold";
 
@@ -37,7 +42,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
             <Link href={`/?m=${shiftMonth(month, 1)}`} className={nav} aria-label="Próximo mês">→</Link>
           </nav>
         </header>
-        <MonthCalendar month={month} today={clock.today()} />
+        <MonthCalendar month={month} today={today} selected={selected} days={days} />
+        <DayTimeline date={selected} occurrences={days[selected] ?? []} />
       </main>
       <CommandBar />
     </>
@@ -60,4 +66,12 @@ async function retryMissingBillsCalendar() {
     console.error("Falha ao criar a Agenda de contas", e);
     return true;
   }
+}
+
+async function loadMonth(month: string, clock: SaoPauloClock) {
+  const supabase = await createUserClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) return {};
+  const repository = new SupabaseRepository(supabase);
+  return (await getMonth({ repository, clock }, data.user.id, month)).days;
 }

@@ -29,6 +29,11 @@ Todo identificador de código (variáveis, funções, classes, tipos, enums, arq
 | Agenda de contas (Google) | `BillsCalendar` |
 | Calendário (visão do app) | `MonthCalendar` |
 | Resumo do mês | `MonthSummary` |
+| Regra de uma Conta (revisão vigente) | `BillRule` |
+| O que a IA extrai de um Comando de cadastro | `Draft` |
+| Vencimentos de um mês, por dia | `MonthView` |
+| Dia do cadastro da Conta (`registeredOn`) | `registeredOn` |
+| Parcelas / mês inicial / mês final de um Comando | `installments` / `startMonth` / `endMonth` |
 
 Valores de Etiqueta: `housing` (Moradia), `utilities` (Utilidades), `transportation` (Transporte), `health` (Saúde), `education` (Educação), `subscriptions` (Assinaturas), `credit_card` (Cartão), `taxes` (Impostos), `insurance` (Seguros), `leisure` (Lazer), `other` (Outros). Os rótulos em pt-BR ficam só na camada de interface.
 
