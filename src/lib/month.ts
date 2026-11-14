@@ -1,4 +1,4 @@
-/** Utilidades de exibição de meses (`YYYY-MM`). Só apresentação. */
+/** Meses (`YYYY-MM`): a aritmética que o core usa e os rótulos da interface. */
 
 const MONTH_NAMES = [
   "janeiro", "fevereiro", "março", "abril", "maio", "junho",
@@ -8,6 +8,15 @@ const MONTH_NAMES = [
 export function isMonth(value: string | undefined): value is string {
   return !!value && /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
 }
+
+/** `2025-08-15` → `2025-08` */
+export const monthOf = (date: string) => date.slice(0, 7);
+
+/** `2025-08` → 8 */
+export const monthNumberOf = (month: string) => Number(month.slice(5, 7));
+
+/** `2025-08` (ou `2025-08-15`) → 2025 */
+export const yearOf = (monthOrDate: string) => Number(monthOrDate.slice(0, 4));
 
 export function shiftMonth(month: string, delta: number): string {
   const [y, m] = month.split("-").map(Number);

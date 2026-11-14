@@ -15,7 +15,7 @@
   --brand: #163300;
   --soft: #e2f6d5;
   --soft-ink: #163300;
-  --late: #8f2228;
+  --overdue: #8f2228;
   --danger: #cb272f;
   --danger-soft: #fbe3e4;
   --border: rgba(14, 15, 12, 0.12);
@@ -37,7 +37,7 @@ html[data-theme="dark"] {
   --brand: #9fe870;
   --soft: #1f3a0f;
   --soft-ink: #cdf3b4;
-  --late: #6e1f24;
+  --overdue: #6e1f24;
   --danger: #ff6b70;
   --danger-soft: #3a1618;
   --border: rgba(244, 248, 239, 0.14);
@@ -59,7 +59,7 @@ html[data-theme="dark"] {
   --color-brand: var(--brand);
   --color-soft: var(--soft);
   --color-softink: var(--soft-ink);
-  --color-late: var(--late);
+  --color-overdue: var(--overdue);
   --color-danger: var(--danger);
   --color-dangersoft: var(--danger-soft);
   --color-line: var(--border);

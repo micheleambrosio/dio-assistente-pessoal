@@ -21,8 +21,5 @@ export const RECURRENCE_LABELS: Record<Recurrence, string> = {
   once: "Avulsa",
 };
 
-const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-export const formatMoney = (value: number) => brl.format(value);
-
 /** `2025-08-15` → `15/08/2025` */
 export const formatDate = (date: string) => date.split("-").reverse().join("/");

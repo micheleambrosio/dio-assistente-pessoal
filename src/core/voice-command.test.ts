@@ -21,7 +21,7 @@ describe("interpretVoiceCommand", () => {
   it("devolve a Prévia com a transcrição ('Você disse: …'), sem persistir nada", async () => {
     const { deps, repository, interpreter } = setup({ draft: monthly, transcript: "internet Vivo cento e vinte todo dia quinze" });
 
-    const result = await interpretVoiceCommand(deps, USER, audio);
+    const result = await interpretVoiceCommand(deps, audio);
 
     expect(result).toEqual({
       ok: true,
@@ -39,12 +39,12 @@ describe("interpretVoiceCommand", () => {
 
   it("devolve not_understood quando a IA não entende o áudio", async () => {
     const { deps } = setup(null);
-    expect(await interpretVoiceCommand(deps, USER, audio)).toEqual({ ok: false, error: "not_understood" });
+    expect(await interpretVoiceCommand(deps, audio)).toEqual({ ok: false, error: "not_understood" });
   });
 
   it("devolve not_understood quando a transcrição vem vazia", async () => {
     const { deps } = setup({ draft: monthly, transcript: "   " });
-    expect(await interpretVoiceCommand(deps, USER, audio)).toEqual({ ok: false, error: "not_understood" });
+    expect(await interpretVoiceCommand(deps, audio)).toEqual({ ok: false, error: "not_understood" });
   });
 
   it.each([
@@ -53,7 +53,7 @@ describe("interpretVoiceCommand", () => {
     ["que não é áudio", { data: new Uint8Array([1]), mimeType: "text/plain" }],
   ] as [string, AudioInput][])("recusa um áudio %s sem chamar a IA", async (_name, invalid) => {
     const { deps, interpreter } = setup({ draft: monthly, transcript: "x" });
-    expect(await interpretVoiceCommand(deps, USER, invalid)).toEqual({ ok: false, error: "invalid_audio" });
+    expect(await interpretVoiceCommand(deps, invalid)).toEqual({ ok: false, error: "invalid_audio" });
     expect(interpreter.audioCalls).toEqual([]);
   });
 });
@@ -61,14 +61,14 @@ describe("interpretVoiceCommand", () => {
 describe("Prévia falada", () => {
   async function voicePreview(correctResult: Draft | null = null) {
     const ctx = setup({ draft: monthly, transcript: "internet Vivo, todo dia quinze" }, correctResult);
-    const result = await interpretVoiceCommand(ctx.deps, USER, audio);
+    const result = await interpretVoiceCommand(ctx.deps, audio);
     if (!result.ok) throw new Error("esperava uma Prévia");
     return { ...ctx, preview: result.preview };
   }
 
   it("a correção mantém a transcrição e a origem de voz", async () => {
     const { deps, preview } = await voicePreview({ ...monthly, day: 16 });
-    const result = await correctPreview(deps, USER, preview, "não, é dia 16");
+    const result = await correctPreview(deps, preview, "não, é dia 16");
     expect(result).toEqual({
       ok: true,
       preview: { ...preview, day: 16, startDate: "2025-01-16" },

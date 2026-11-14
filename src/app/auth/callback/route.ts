@@ -31,8 +31,9 @@ export async function GET(request: NextRequest) {
     const calendar = new GoogleCalendarGateway();
     // Reconectar limpa o aviso de acesso revogado e sincroniza as pendências. Vem primeiro
     // para que uma falha ao criar a agenda não deixe o aviso preso.
-    await reconnectGoogle({ repository, calendar, clock: new SaoPauloClock(), appUrl: appUrl() }, userId);
-    await ensureBillsCalendar({ repository, calendar }, userId);
+    const deps = { repository, calendar, clock: new SaoPauloClock(), appUrl: appUrl() };
+    await reconnectGoogle(deps, userId);
+    await ensureBillsCalendar(deps, userId);
   } catch (e) {
     console.error("Falha ao garantir a Agenda de contas", e);
   }

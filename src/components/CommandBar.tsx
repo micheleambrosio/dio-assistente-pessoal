@@ -6,7 +6,8 @@ import { confirmPreviewAction, correctPreviewAction, interpretCommandAction, int
 import type { Preview } from "@/core/domain";
 import { Spinner } from "./Spinner";
 import { VoiceRecorder } from "./VoiceRecorder";
-import { RECURRENCE_LABELS, TAG_LABELS, formatDate, formatMoney } from "@/lib/labels";
+import { RECURRENCE_LABELS, TAG_LABELS, formatDate } from "@/lib/labels";
+import { formatMoney } from "@/lib/money";
 
 const ERRORS = {
   not_understood: "Não entendi o Comando. Tente algo como “internet Vivo, 120, todo dia 15”.",

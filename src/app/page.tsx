@@ -11,10 +11,10 @@ import { MonthNav } from "@/components/MonthNav";
 import { MonthSkeleton } from "@/components/MonthSkeleton";
 import { PendingRemindersNotice } from "@/components/PendingRemindersNotice";
 import type { Clock } from "@/core/ports";
-import { getMonth } from "@/core/commands";
+import { getMonth } from "@/core/month-view";
 import { ensureBillsCalendar } from "@/core/ensure-bills-calendar";
-import { syncOnAppOpen } from "@/core/reminders";
-import type { SyncStatus } from "@/core/reminders";
+import { syncReminders } from "@/core/reminders";
+import type { RemindersSyncSummary } from "@/core/reminders";
 import { getClock, getRuntime } from "@/infra/runtime";
 import { isMonth, monthLabel, shiftMonth } from "@/lib/month";
 
@@ -69,7 +69,7 @@ async function MonthBody({ month, day, clock }: { month: string; day?: string; c
 
 async function Notices({ clock }: { clock: Clock }) {
   const calendarFailed = await retryMissingBillsCalendar();
-  const sync = await syncReminders(clock);
+  const sync = await syncRemindersOnOpen(clock);
   return (
     <>
       {calendarFailed && (
@@ -94,11 +94,11 @@ async function retryMissingBillsCalendar() {
   const runtime = await getRuntime();
   if (!runtime) return false;
 
-  const { repository, calendar, userId } = runtime;
+  const { repository, userId } = runtime;
   if (await repository.getBillsCalendarId(userId)) return false;
 
   try {
-    await ensureBillsCalendar({ repository, calendar }, userId);
+    await ensureBillsCalendar(runtime, userId);
     return false;
   } catch (e) {
     console.error("Falha ao criar a Agenda de contas", e);
@@ -113,11 +113,11 @@ async function loadMonth(month: string, clock: Clock) {
 }
 
 /** Estende a Janela de lembretes e retoma os pendentes. null = Usuário sem sessão ou falha inesperada. */
-async function syncReminders(clock: Clock): Promise<SyncStatus | null> {
+async function syncRemindersOnOpen(clock: Clock): Promise<RemindersSyncSummary | null> {
   const runtime = await getRuntime();
   if (!runtime) return null;
   try {
-    return await syncOnAppOpen(
+    return await syncReminders(
       { repository: runtime.repository, calendar: runtime.calendar, clock, appUrl: runtime.appUrl },
       runtime.userId,
     );

@@ -112,7 +112,7 @@ export class SupabaseRepository implements Repository {
   async listReminders(userId: string) {
     const { data, error } = await this.client
       .from("reminders")
-      .select("id, bill_id, reference_month, effective_date, title, amount, tags, paid, sync_status, google_event_id, last_error")
+      .select("id, bill_id, reference_month, effective_date, title, amount, tags, is_paid, sync_status, google_event_id, last_error")
       .eq("user_id", userId)
       .order("effective_date");
     if (error) throw error;
@@ -124,7 +124,7 @@ export class SupabaseRepository implements Repository {
         effectiveDate: row.effective_date,
         title: row.title,
         tags: row.tags as Tag[],
-        paid: row.paid,
+        isPaid: row.is_paid,
         syncStatus: row.sync_status as ReminderSyncStatus,
         ...(row.amount !== null && { amount: Number(row.amount) }),
         ...(row.google_event_id !== null && { googleEventId: row.google_event_id }),
@@ -146,7 +146,7 @@ export class SupabaseRepository implements Repository {
           title: r.title,
           amount: r.amount ?? null,
           tags: r.tags,
-          paid: r.paid,
+          is_paid: r.isPaid,
           sync_status: r.syncStatus,
           google_event_id: r.googleEventId ?? null,
           last_error: r.lastError ?? null,
@@ -162,13 +162,13 @@ export class SupabaseRepository implements Repository {
   async updateReminder(
     userId: string,
     id: string,
-    patch: Partial<Pick<Reminder, "syncStatus" | "googleEventId" | "lastError" | "paid" | "amount">>,
+    patch: Partial<Pick<Reminder, "syncStatus" | "googleEventId" | "lastError" | "isPaid" | "amount">>,
   ) {
     const columns: Record<string, unknown> = {};
     if ("syncStatus" in patch) columns.sync_status = patch.syncStatus;
     if ("googleEventId" in patch) columns.google_event_id = patch.googleEventId ?? null;
     if ("lastError" in patch) columns.last_error = patch.lastError ?? null;
-    if ("paid" in patch) columns.paid = patch.paid;
+    if ("isPaid" in patch) columns.is_paid = patch.isPaid;
     if ("amount" in patch) columns.amount = patch.amount ?? null;
     const { error } = await this.client.from("reminders").update(columns).eq("user_id", userId).eq("id", id);
     if (error) throw error;

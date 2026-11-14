@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { confirmPreview, getMonth, interpretCommand } from "./commands";
+import { confirmPreview, interpretCommand } from "./commands";
+import { getMonth } from "./month-view";
 import type { Draft } from "./domain";
 import { FakeCalendarGateway } from "./fakes/fake-calendar-gateway";
 import { FakeCommandInterpreter } from "./fakes/fake-command-interpreter";
@@ -19,7 +20,7 @@ function setup(today: string) {
 }
 
 async function register(deps: ReturnType<typeof setup>["deps"], draft: Draft) {
-  const result = await interpretCommand({ ...deps, interpreter: new FakeCommandInterpreter(draft, null) }, USER, "comando");
+  const result = await interpretCommand({ ...deps, interpreter: new FakeCommandInterpreter(draft, null) }, "comando");
   if (!result.ok) throw new Error("esperava uma Prévia");
   const confirmed = await confirmPreview(deps, USER, result.preview);
   if (!confirmed.ok) throw new Error("esperava confirmar");
@@ -52,9 +53,9 @@ describe("Atrasado", () => {
     const { deps, on } = setup("2025-01-01");
     const billId = await register(deps, bill("Luz", 10, 100));
     const today = on("2025-01-10");
-    await togglePaid(today, USER, { billId, referenceMonth: "2025-01", paid: true });
+    await togglePaid(today, USER, { billId, referenceMonth: "2025-01", isPaid: true });
 
-    await togglePaid(today, USER, { billId, referenceMonth: "2025-01", paid: false });
+    await togglePaid(today, USER, { billId, referenceMonth: "2025-01", isPaid: false });
 
     const view = await getMonth(today, USER, "2025-01");
     expect(view.days["2025-01-10"][0]).toMatchObject({ isPaid: false, isOverdue: false });
@@ -66,7 +67,7 @@ describe("Atrasado", () => {
     const { deps, on } = setup("2025-01-01");
     const billId = await register(deps, bill("Luz", 10, 100));
 
-    await togglePaid(on("2025-01-20"), USER, { billId, referenceMonth: "2025-01", paid: true });
+    await togglePaid(on("2025-01-20"), USER, { billId, referenceMonth: "2025-01", isPaid: true });
 
     expect((await getMonth(on("2025-01-20"), USER, "2025-01")).overdue).toEqual([]);
   });
@@ -114,7 +115,7 @@ describe("Resumo do mês", () => {
     const luz = await register(deps, bill("Luz", 10, 100)); // 10/06
     await register(deps, bill("Água", 20, 50)); // 20/06
     await register(deps, bill("Net", 25, 80)); // 25/06
-    await togglePaid(deps, USER, { billId: luz, referenceMonth: "2025-06", paid: true, amount: 110 });
+    await togglePaid(deps, USER, { billId: luz, referenceMonth: "2025-06", isPaid: true, amount: 110 });
 
     const { summary } = await getMonth(on("2025-06-22"), USER, "2025-06");
 
@@ -133,7 +134,7 @@ describe("Resumo do mês", () => {
     const { deps, on } = setup("2025-05-01");
     const energia = await register(deps, bill("Energia", 31, 200)); // vence 31/05 (sábado), Data efetiva 02/06
     const today = on("2025-06-02");
-    await togglePaid(today, USER, { billId: energia, referenceMonth: "2025-05", paid: true });
+    await togglePaid(today, USER, { billId: energia, referenceMonth: "2025-05", isPaid: true });
 
     const may = await getMonth(today, USER, "2025-05");
     const june = await getMonth(today, USER, "2025-06");
@@ -149,7 +150,7 @@ describe("Resumo do mês", () => {
     const sem = await register(deps, bill("Condomínio", 10)); // sem valor
     await register(deps, bill("Luz", 12, 100));
     await register(deps, bill("Net", 14));
-    await togglePaid(deps, USER, { billId: sem, referenceMonth: "2025-06", paid: true });
+    await togglePaid(deps, USER, { billId: sem, referenceMonth: "2025-06", isPaid: true });
 
     const { summary } = await getMonth(on("2025-06-05"), USER, "2025-06");
 

@@ -3,10 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { togglePaidAction } from "@/app/actions";
+import { occurrenceKey } from "@/core/domain";
 import type { Occurrence } from "@/core/domain";
-import { RECURRENCE_LABELS, TAG_LABELS, formatDate, formatMoney } from "@/lib/labels";
-import { toMasked, maskMoney, unmaskMoney } from "@/lib/money";
-import { monthLabel } from "@/lib/month";
+import { RECURRENCE_LABELS, TAG_LABELS, formatDate } from "@/lib/labels";
+import { formatMoney, maskMoney, toMasked, unmaskMoney } from "@/lib/money";
+import { monthLabel, monthOf } from "@/lib/month";
 import { Spinner } from "./Spinner";
 
 const ERRORS = {
@@ -38,7 +39,7 @@ export function OccurrenceRow({ occurrence: o, showDate = false }: { occurrence:
   const [saving, setSaving] = useState<"status" | "amount" | null>(null);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const key = o.billId + o.referenceMonth;
+  const key = occurrenceKey(o);
   // "in": acabou de ser marcado (traço + partículas); "out": acabou de ser desmarcado.
   const [change, setChange] = useState<"in" | "out" | null>(() => recentChange.get(key) ?? null);
 
@@ -48,20 +49,22 @@ export function OccurrenceRow({ occurrence: o, showDate = false }: { occurrence:
     return () => clearTimeout(id);
   }, [key, change]);
 
-  const late = o.isOverdue;
-  const forest = o.isPaid;
-  const refMonth = o.effectiveDate.slice(0, 7);
+  const overdue = o.isOverdue;
+  // Pago em cartão forest, Atrasado em vermelho: os dois são cartões escuros com texto branco.
+  const onDark = overdue || o.isPaid;
+  // Quando a Data efetiva cai noutro mês (a "Energia de maio" que vence em 2/jun), mostra o Mês de referência.
+  const effectiveMonth = monthOf(o.effectiveDate);
 
-  function submit(kind: "status" | "amount", paid: boolean, amount?: number) {
+  function submit(kind: "status" | "amount", isPaid: boolean, amount?: number) {
     setError(null);
     setSaving(kind);
     startTransition(async () => {
-      const result = await togglePaidAction({ billId: o.billId, referenceMonth: o.referenceMonth, paid, ...(amount !== undefined && { amount }) });
+      const result = await togglePaidAction({ billId: o.billId, referenceMonth: o.referenceMonth, isPaid, ...(amount !== undefined && { amount }) });
       setSaving(null);
       if (!result.ok) return setError(ERRORS[result.error]);
       if (kind === "status") {
-        recentChange.set(key, paid ? "in" : "out");
-        setChange(paid ? "in" : "out");
+        recentChange.set(key, isPaid ? "in" : "out");
+        setChange(isPaid ? "in" : "out");
       } else {
         setEditing(false);
       }
@@ -90,9 +93,8 @@ export function OccurrenceRow({ occurrence: o, showDate = false }: { occurrence:
   }
 
   const pill = (extra: string) => `rounded-full px-2 py-0.5 text-[11px] font-medium ${extra}`;
-  const onDark = late || forest;
   const neutral = pill(onDark ? "bg-white/15 text-white" : "bg-surface2 text-body");
-  const card = late ? "bg-late text-white" : forest ? "bg-dark text-white" : o.isPaid ? "bg-surface2" : "bg-surface";
+  const card = overdue ? "bg-overdue text-white" : o.isPaid ? "bg-dark text-white" : "bg-surface";
 
   return (
     <li className={`rounded-[22px] p-3 pr-4 ${card}`}>
@@ -105,7 +107,7 @@ export function OccurrenceRow({ occurrence: o, showDate = false }: { occurrence:
           aria-busy={pending}
           aria-pressed={o.isPaid}
           className={`relative grid size-8 shrink-0 place-items-center rounded-full border-2 transition duration-200 hover:scale-110 active:scale-90 ${
-            o.isPaid ? "border-lime bg-lime text-limeink" : late ? "border-[#ffb3b6] text-white hover:bg-white/10" : "border-muted/60 text-ink hover:bg-surface2"
+            o.isPaid ? "border-lime bg-lime text-limeink" : overdue ? "border-[#ffb3b6] text-white hover:bg-white/10" : "border-muted/60 text-ink hover:bg-surface2"
           } ${saving === "status" ? "cursor-progress" : ""} ${change === "in" && o.isPaid ? "check-pop" : ""}`}
         >
           {saving === "status" ? (
@@ -115,7 +117,7 @@ export function OccurrenceRow({ occurrence: o, showDate = false }: { occurrence:
               <path d="M5 12.5l4.5 4.5L19 7.5" className={change === "in" ? "check-draw" : undefined} />
             </svg>
           ) : change === "out" ? (
-            <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={late ? "#ffb3b6" : "currentColor"} strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" className="check-out opacity-0">
+            <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={overdue ? "#ffb3b6" : "currentColor"} strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" className="check-out opacity-0">
               <path d="M5 12.5l4.5 4.5L19 7.5" />
             </svg>
           ) : null}
@@ -126,17 +128,17 @@ export function OccurrenceRow({ occurrence: o, showDate = false }: { occurrence:
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className={`truncate text-[15px] font-semibold ${onDark ? "text-white" : "text-ink"} ${o.isPaid && !forest ? "line-through opacity-60" : ""}`}>
+            <span className={`truncate text-[15px] font-semibold ${onDark ? "text-white" : "text-ink"}`}>
               {o.title}
             </span>
-            {late && (
+            {overdue && (
               <span className={`${pill("bg-white font-semibold text-[#8f2228]")} inline-flex items-center gap-1`}>
                 <svg aria-hidden width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5 1.8 20.5h20.4L12 2.5Zm-1 7h2v5h-2v-5Zm0 6.5h2v2h-2v-2Z" /></svg>
                 Atrasada
               </span>
             )}
             {o.recurrence !== "monthly" && <span className={neutral}>{RECURRENCE_LABELS[o.recurrence]}</span>}
-            {o.referenceMonth !== refMonth && (
+            {o.referenceMonth !== effectiveMonth && (
               <span className={`${neutral} inline-flex items-center gap-1`}>
                 <svg aria-hidden width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M8 3v4M16 3v4M3 10h18" /></svg>
                 ref. {monthLabel(o.referenceMonth).name}
@@ -145,7 +147,7 @@ export function OccurrenceRow({ occurrence: o, showDate = false }: { occurrence:
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {o.tags.map((t) => (
-              <span key={t} className={pill(late ? "bg-[#ffb3b6]/20 text-[#ffd9db]" : forest ? "bg-white/15 text-white" : "bg-soft text-softink")}>
+              <span key={t} className={pill(overdue ? "bg-[#ffb3b6]/20 text-[#ffd9db]" : o.isPaid ? "bg-white/15 text-white" : "bg-soft text-softink")}>
                 {TAG_LABELS[t]}
               </span>
             ))}
@@ -195,7 +197,7 @@ export function OccurrenceRow({ occurrence: o, showDate = false }: { occurrence:
         </div>
       </div>
       {error && (
-        <p role="alert" className={`mt-2 pl-11 text-sm ${late ? "text-white" : "text-danger"}`}>
+        <p role="alert" className={`mt-2 pl-11 text-sm ${overdue ? "text-white" : "text-danger"}`}>
           {error}
         </p>
       )}

@@ -19,7 +19,7 @@ export interface Repository {
   updateReminder(
     userId: string,
     id: string,
-    patch: Partial<Pick<Reminder, "syncStatus" | "googleEventId" | "lastError" | "paid" | "amount">>,
+    patch: Partial<Pick<Reminder, "syncStatus" | "googleEventId" | "lastError" | "isPaid" | "amount">>,
   ): Promise<void>;
   deleteReminder(userId: string, id: string): Promise<void>;
   /** true quando o Google recusou a autenticação e o Usuário precisa reconectar. */

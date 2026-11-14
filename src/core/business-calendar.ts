@@ -1,4 +1,5 @@
 /** Calendário de negócios: Feriados, Dia útil e Data efetiva. Datas são `YYYY-MM-DD`. */
+import { yearOf } from "@/lib/month";
 
 const DAY_MS = 86_400_000;
 
@@ -59,7 +60,7 @@ export function holidays(year: number): Set<string> {
 function isBusinessDay(date: string): boolean {
   const weekday = toUtc(date).getUTCDay();
   if (weekday === 0 || weekday === 6) return false;
-  return !holidays(Number(date.slice(0, 4))).has(date);
+  return !holidays(yearOf(date)).has(date);
 }
 
 /** Data de vencimento ajustada para o próximo Dia útil (pode cruzar o mês). */

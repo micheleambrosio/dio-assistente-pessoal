@@ -1,3 +1,4 @@
+import { occurrenceKey } from "@/core/domain";
 import type { Occurrence } from "@/core/domain";
 import { OccurrenceRow } from "./OccurrenceRow";
 import { Timeline, TimelineItem } from "./Timeline";
@@ -16,7 +17,7 @@ export function OverdueTimeline({ occurrences }: { occurrences: Occurrence[] }) 
       </h2>
       <Timeline>
         {occurrences.map((o, i) => (
-          <TimelineItem key={o.billId + o.referenceMonth} index={i} dot="late">
+          <TimelineItem key={occurrenceKey(o)} index={i} dot="overdue">
             <OccurrenceRow occurrence={o} showDate />
           </TimelineItem>
         ))}

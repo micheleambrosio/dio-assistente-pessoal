@@ -5,7 +5,7 @@ import { FakeCalendarGateway } from "./fakes/fake-calendar-gateway";
 import { FakeCommandInterpreter } from "./fakes/fake-command-interpreter";
 import { FixedClock } from "./fakes/fixed-clock";
 import { InMemoryRepository } from "./fakes/in-memory-repository";
-import { reconnectGoogle, syncOnAppOpen } from "./reminders";
+import { reconnectGoogle, syncReminders } from "./reminders";
 import { GoogleAuthError } from "./ports";
 
 const USER = "user-1";
@@ -23,7 +23,7 @@ const monthly: Draft = { title: "Internet Vivo", amount: 120, recurrence: "month
 
 async function register(deps: ReturnType<typeof setup>["deps"], draft: Draft) {
   const interpreter = new FakeCommandInterpreter(draft, null);
-  const result = await interpretCommand({ ...deps, interpreter }, USER, "comando");
+  const result = await interpretCommand({ ...deps, interpreter }, "comando");
   if (!result.ok) throw new Error("esperava uma Prévia");
   const confirmed = await confirmPreview(deps, USER, result.preview);
   if (!confirmed.ok) throw new Error("esperava confirmar");
@@ -134,14 +134,14 @@ describe("quando o Google falha", () => {
   });
 });
 
-describe("syncOnAppOpen: Lembretes pendentes", () => {
+describe("syncReminders: Lembretes pendentes", () => {
   it("tenta de novo os pendentes e os sincroniza quando o Google volta", async () => {
     const { deps, repository, calendar } = setup();
     calendar.failWith(new Error("Google fora do ar"));
     await register(deps, { ...monthly, installments: 2 });
     calendar.failWith(null);
 
-    const status = await syncOnAppOpen(deps, USER);
+    const status = await syncReminders(deps, USER);
 
     expect(status).toEqual({ pendingCount: 0, accessRevoked: false });
     expect(calendar.events()).toHaveLength(2);
@@ -154,15 +154,15 @@ describe("syncOnAppOpen: Lembretes pendentes", () => {
     calendar.failWith(new Error("Google fora do ar"));
     await register(deps, { ...monthly, installments: 2 });
 
-    expect(await syncOnAppOpen(deps, USER)).toEqual({ pendingCount: 2, accessRevoked: false });
+    expect(await syncReminders(deps, USER)).toEqual({ pendingCount: 2, accessRevoked: false });
   });
 
   it("não duplica eventos de Lembretes já sincronizados", async () => {
     const { deps, calendar } = setup();
     await register(deps, { ...monthly, installments: 2 });
 
-    await syncOnAppOpen(deps, USER);
-    await syncOnAppOpen(deps, USER);
+    await syncReminders(deps, USER);
+    await syncReminders(deps, USER);
 
     expect(calendar.events()).toHaveLength(2);
   });
@@ -176,7 +176,7 @@ describe("syncOnAppOpen: Lembretes pendentes", () => {
     await repository.updateReminder(USER, c.id, { syncStatus: "pending_create", googleEventId: undefined });
     await calendar.deleteReminder(USER, "x", c.googleEventId!);
 
-    await syncOnAppOpen(deps, USER);
+    await syncReminders(deps, USER);
 
     const left = await repository.listReminders(USER);
     expect(left.map((r) => r.id)).toEqual([a.id, c.id]);
@@ -195,7 +195,7 @@ describe("acesso revogado", () => {
     expect(await repository.isAccessRevoked(USER)).toBe(true);
     const reminders = await repository.listReminders(USER);
     expect(reminders.map((r) => r.syncStatus)).toEqual(["pending_create", "pending_create", "pending_create"]);
-    expect(await syncOnAppOpen(deps, USER)).toEqual({ pendingCount: 3, accessRevoked: true });
+    expect(await syncReminders(deps, USER)).toEqual({ pendingCount: 3, accessRevoked: true });
   });
 
   it("não chama o Google enquanto o acesso estiver revogado", async () => {
@@ -204,7 +204,7 @@ describe("acesso revogado", () => {
     await register(deps, { ...monthly, installments: 2 });
     calendar.failWith(null);
 
-    await syncOnAppOpen(deps, USER);
+    await syncReminders(deps, USER);
 
     expect(calendar.events()).toEqual([]);
   });
@@ -223,7 +223,7 @@ describe("acesso revogado", () => {
   });
 });
 
-describe("syncOnAppOpen: Janela de lembretes", () => {
+describe("syncReminders: Janela de lembretes", () => {
   const later = (today: string) => ({ clock: new FixedClock(new Date(`${today}T12:00:00-03:00`)) });
   const months = (calendar: FakeCalendarGateway) => calendar.events().map((e) => e.event.start.slice(0, 7)).sort();
 
@@ -231,7 +231,7 @@ describe("syncOnAppOpen: Janela de lembretes", () => {
     const { deps, calendar } = setup("2025-01-10");
     await register(deps, monthly); // Lembretes de 2025-01 a 2025-12
 
-    await syncOnAppOpen({ ...deps, ...later("2025-12-05") }, USER);
+    await syncReminders({ ...deps, ...later("2025-12-05") }, USER);
 
     const all = months(calendar);
     expect(all).toHaveLength(24);
@@ -243,7 +243,7 @@ describe("syncOnAppOpen: Janela de lembretes", () => {
     const { deps, calendar } = setup("2025-01-10");
     await register(deps, monthly);
 
-    await syncOnAppOpen({ ...deps, ...later("2025-11-30") }, USER);
+    await syncReminders({ ...deps, ...later("2025-11-30") }, USER);
 
     expect(calendar.events()).toHaveLength(12);
   });
@@ -252,7 +252,7 @@ describe("syncOnAppOpen: Janela de lembretes", () => {
     const { deps, calendar } = setup("2025-01-10");
     await register(deps, monthly);
 
-    await syncOnAppOpen({ ...deps, ...later("2026-04-01") }, USER);
+    await syncReminders({ ...deps, ...later("2026-04-01") }, USER);
 
     const all = months(calendar);
     expect(all).toHaveLength(24);
@@ -265,8 +265,8 @@ describe("syncOnAppOpen: Janela de lembretes", () => {
     await register(deps, monthly);
     const open = { ...deps, ...later("2025-12-05") };
 
-    await syncOnAppOpen(open, USER);
-    await syncOnAppOpen(open, USER);
+    await syncReminders(open, USER);
+    await syncReminders(open, USER);
 
     expect(calendar.events()).toHaveLength(24);
   });
@@ -277,7 +277,7 @@ describe("syncOnAppOpen: Janela de lembretes", () => {
       title: "Luz", recurrence: "monthly", day: 15, startDate: "2025-01-15", tags: ["utilities"], registeredOn: "2025-01-10",
     });
 
-    await syncOnAppOpen(deps, USER);
+    await syncReminders(deps, USER);
 
     expect(calendar.events()).toHaveLength(12);
   });
@@ -286,13 +286,13 @@ describe("syncOnAppOpen: Janela de lembretes", () => {
     const { deps, calendar } = setup("2025-01-10");
     await register(deps, { ...monthly, installments: 2 });
 
-    await syncOnAppOpen({ ...deps, ...later("2025-06-01") }, USER);
+    await syncReminders({ ...deps, ...later("2025-06-01") }, USER);
 
     expect(calendar.events()).toHaveLength(2);
   });
 });
 
-describe("syncOnAppOpen: Agenda de contas apagada", () => {
+describe("syncReminders: Agenda de contas apagada", () => {
   it("recria a agenda e todos os Lembretes da Janela atual", async () => {
     const { deps, repository, calendar } = setup("2025-01-10");
     await register(deps, { ...monthly, installments: 3 });
@@ -300,7 +300,7 @@ describe("syncOnAppOpen: Agenda de contas apagada", () => {
     calendar.deleteExternally(calendarId);
     expect(calendar.events()).toEqual([]);
 
-    const status = await syncOnAppOpen(deps, USER);
+    const status = await syncReminders(deps, USER);
 
     expect(status.pendingCount).toBe(0);
     expect(calendar.existingIds()).toHaveLength(1);
@@ -310,13 +310,42 @@ describe("syncOnAppOpen: Agenda de contas apagada", () => {
   });
 });
 
+describe("Agenda de contas apagada: falha no meio da recriação", () => {
+  it("se a recriação falhar antes de gravar o id novo, a próxima abertura recria a agenda e os Lembretes", async () => {
+    const { deps, repository, calendar } = setup("2025-01-10");
+    await register(deps, { ...monthly, installments: 3 });
+    const [oldId] = calendar.existingIds();
+    calendar.deleteExternally(oldId);
+
+    // O banco cai bem na hora de pôr os Lembretes como pendentes.
+    const update = repository.updateReminder.bind(repository);
+    let failNext = true;
+    repository.updateReminder = async (...args) => {
+      if (failNext) {
+        failNext = false;
+        throw new Error("banco fora do ar");
+      }
+      return update(...args);
+    };
+    await syncReminders(deps, USER);
+    expect(await repository.getBillsCalendarId(USER)).toBe(oldId);
+
+    await syncReminders(deps, USER);
+
+    const [newId] = calendar.existingIds();
+    expect(calendar.existingIds()).toHaveLength(1);
+    expect(await repository.getBillsCalendarId(USER)).toBe(newId);
+    expect(calendar.events().map((e) => e.calendarId)).toEqual(Array(3).fill(newId));
+  });
+});
+
 describe("Agenda de contas apagada: só a Janela atual", () => {
   it("não recria no Calendar os Lembretes de datas que já passaram", async () => {
     const { deps, calendar } = setup("2025-01-10");
     await register(deps, { ...monthly, installments: 3 }); // 15/01, 15/02, 17/03 (15/03 é sábado)
     calendar.deleteExternally(calendar.existingIds()[0]);
 
-    await syncOnAppOpen({ ...deps, clock: new FixedClock(new Date("2025-02-20T12:00:00-03:00")) }, USER);
+    await syncReminders({ ...deps, clock: new FixedClock(new Date("2025-02-20T12:00:00-03:00")) }, USER);
 
     expect(calendar.events().map((e) => e.event.start.slice(0, 10))).toEqual(["2025-03-17"]);
   });
@@ -328,7 +357,7 @@ describe("sincronização de mão única", () => {
     await register(deps, { ...monthly, installments: 2 });
     await calendar.deleteReminder(USER, "x", calendar.events()[0].id);
 
-    const status = await syncOnAppOpen(deps, USER);
+    const status = await syncReminders(deps, USER);
 
     expect(status.pendingCount).toBe(0);
     expect(calendar.events()).toHaveLength(1);

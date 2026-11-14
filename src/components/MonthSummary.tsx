@@ -4,7 +4,7 @@ import { Drawer } from "antd";
 import { useEffect, useRef, useState } from "react";
 import type { Occurrence } from "@/core/domain";
 import type { MonthSummary as Summary } from "@/core/month-summary";
-import { formatMoney } from "@/lib/labels";
+import { formatMoney } from "@/lib/money";
 import { OccurrenceRow } from "./OccurrenceRow";
 
 /** Conta de 0 até o valor (e de um valor ao outro) em ~700 ms; sem animação se o Usuário prefere menos movimento. */
