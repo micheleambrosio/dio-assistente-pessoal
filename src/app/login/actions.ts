@@ -19,3 +19,11 @@ export async function signInWithGoogle() {
   if (error || !data.url) redirect("/login?error=oauth");
   redirect(data.url);
 }
+
+/** Encerra a sessão. Não apaga Contas nem a conexão com o Google (google_connections). */
+export async function signOut() {
+  const supabase = await createUserClient();
+  const { error } = await supabase.auth.signOut();
+  if (error) console.error("Falha ao encerrar a sessão", error);
+  redirect("/login");
+}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AccountMenu } from "@/components/AccountMenu";
 import { CommandBar } from "@/components/CommandBar";
 import { DayTimeline } from "@/components/DayTimeline";
 import { MonthCalendar } from "@/components/MonthCalendar";
@@ -36,11 +37,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
           <h1 className="display text-[clamp(52px,11vw,120px)] uppercase">
             {name} <span className="ml-1 text-[0.4em] text-muted">{year}</span>
           </h1>
-          <nav aria-label="Navegação de mês" className="flex items-center gap-2">
-            <Link href={`/?m=${shiftMonth(month, -1)}`} className={nav} aria-label="Mês anterior">←</Link>
-            <Link href="/" className="rounded-full px-3 py-2 text-xs font-semibold text-ink underline">Hoje</Link>
-            <Link href={`/?m=${shiftMonth(month, 1)}`} className={nav} aria-label="Próximo mês">→</Link>
-          </nav>
+          <div className="flex items-center gap-2">
+            <nav aria-label="Navegação de mês" className="flex items-center gap-2">
+              <Link href={`/?m=${shiftMonth(month, -1)}`} className={nav} aria-label="Mês anterior">←</Link>
+              <Link href="/" className="rounded-full px-3 py-2 text-xs font-semibold text-ink underline">Hoje</Link>
+              <Link href={`/?m=${shiftMonth(month, 1)}`} className={nav} aria-label="Próximo mês">→</Link>
+            </nav>
+            <AccountMenu />
+          </div>
         </header>
         <MonthCalendar month={month} today={today} selected={selected} days={days} />
         <div className="mt-1">
