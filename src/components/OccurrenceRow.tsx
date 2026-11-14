@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { togglePaidAction } from "@/app/actions";
 import type { Occurrence } from "@/core/domain";
 import { RECURRENCE_LABELS, TAG_LABELS, formatDate, formatMoney } from "@/lib/labels";
+import { toMasked, maskMoney, unmaskMoney } from "@/lib/money";
 import { monthLabel } from "@/lib/month";
 import { Spinner } from "./Spinner";
 
@@ -13,16 +14,6 @@ const ERRORS = {
   not_found: "Essa Conta não existe mais.",
   unavailable: "Não deu certo agora. Tente de novo.",
 } as const;
-
-/** "1.234,56" ou "120" → número; vazio → undefined; inválido → null. */
-function parseAmount(text: string): number | undefined | null {
-  const clean = text.replace(/[R$\s]/g, "");
-  if (!clean) return undefined;
-  // Sem vírgula, "1.234" é mil duzentos e trinta e quatro (pt-BR), não 1,234.
-  const thousands = /^\d{1,3}(\.\d{3})+$/.test(clean);
-  const value = Number(clean.includes(",") || thousands ? clean.replace(/\./g, "").replace(",", ".") : clean);
-  return Number.isFinite(value) && value >= 0 ? value : null;
-}
 
 /**
  * Depois de marcar/desmarcar, a linha pode trocar de lista (Atrasadas → dia) e remontar.
@@ -84,15 +75,14 @@ export function OccurrenceRow({ occurrence: o, highlight = false, showDate = fal
   }
 
   function startEditing() {
-    setText(o.amount !== undefined ? String(o.amount).replace(".", ",") : "");
+    setText(toMasked(o.amount));
     setError(null);
     setEditing((value) => !value);
   }
 
   function saveAmount(e: React.FormEvent) {
     e.preventDefault();
-    const amount = parseAmount(text);
-    if (amount === null) return setError(ERRORS.invalid_amount);
+    const amount = unmaskMoney(text);
     if (amount === undefined || amount === o.amount) return setEditing(false); // nada a mudar
     submit("amount", o.isPaid, amount); // mantém o status; só o valor muda
   }
@@ -191,10 +181,10 @@ export function OccurrenceRow({ occurrence: o, highlight = false, showDate = fal
             id={`paid-${o.billId}-${o.referenceMonth}`}
             inputMode="decimal"
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => setText(maskMoney(e.target.value))}
             autoFocus
-            placeholder="0,00"
-            className="h-9 w-32 rounded-full border border-line bg-bg px-4 text-sm text-ink focus:border-brand focus:outline-none"
+            placeholder="R$ 0,00"
+            className="h-9 w-36 rounded-full border border-line bg-bg px-4 text-sm text-ink focus:border-brand focus:outline-none"
           />
           <button type="submit" disabled={pending} className="h-9 rounded-full bg-lime px-4 text-sm font-semibold text-limeink disabled:opacity-50">
             {saving === "amount" ? "Salvando…" : "Salvar valor"}
