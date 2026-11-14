@@ -85,7 +85,7 @@ A visão mensal dentro do app que destaca os dias com Vencimentos.
 _Avoid_: Agenda
 
 **Data de início**:
-A data do primeiro Vencimento de uma Conta. Por padrão é o próximo Vencimento a partir do cadastro, mas pode ser anterior a ele ("desde janeiro").
+A data do primeiro Vencimento de uma Conta. Por padrão é o próximo Vencimento a partir do cadastro (o primeiro cuja Data efetiva é no dia do cadastro ou depois), mas pode ser anterior a ele ("desde janeiro").
 _Avoid_: Data de cadastro, data de criação
 
 **Etiqueta**:

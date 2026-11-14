@@ -20,7 +20,7 @@ Termos conforme o [GLOSSARY.md](../../GLOSSARY.md). Referências visuais nesta p
 - Sem valor: um selo tracejado "sem valor".
 - Mês de referência diferente do dia exibido: a marca "ref. <mês>".
 - Periodicidade avulsa ou anual: um selo.
-- **Pago:** o primeiro Pago do dia vira um cartão escuro (forest `#163300`) com texto branco e check lime. Os demais Pagos ficam em cartão cinza.
+- **Pago:** todo Pago vira um cartão escuro (forest `#163300`) com texto branco e check lime, também na gaveta do Resumo. O protótipo destacava só o primeiro Pago do dia e deixava os demais em cinza, mas isso foi trocado por decisão de produto.
 - **Atrasado:** o cartão inteiro fica em vermelho escuro (`#8f2228` no light, `#6e1f24` no dark), com texto branco, selo "Atrasada" branco com texto vermelho, Etiquetas em rosa translúcido e check só com borda rosa (`#ffb3b6`).
 - Título "Atrasadas" na mesma cor de "Hoje", com o ícone de alerta vermelho piscando.
 
