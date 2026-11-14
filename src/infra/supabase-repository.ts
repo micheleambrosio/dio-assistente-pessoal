@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { BillRule, Recurrence, Tag } from "@/core/domain";
+import type { BillRule, Recurrence, Reminder, ReminderSyncStatus, Tag } from "@/core/domain";
 import type { Repository } from "@/core/ports";
 
 export class SupabaseRepository implements Repository {
@@ -76,5 +76,88 @@ export class SupabaseRepository implements Repository {
         },
       ];
     });
+  }
+
+  async listReminders(userId: string) {
+    const { data, error } = await this.client
+      .from("reminders")
+      .select("id, bill_id, reference_month, effective_date, title, amount, tags, sync_status, google_event_id, last_error")
+      .eq("user_id", userId)
+      .order("effective_date");
+    if (error) throw error;
+    return (data ?? []).map(
+      (row): Reminder => ({
+        id: row.id,
+        billId: row.bill_id,
+        referenceMonth: row.reference_month,
+        effectiveDate: row.effective_date,
+        title: row.title,
+        tags: row.tags as Tag[],
+        syncStatus: row.sync_status as ReminderSyncStatus,
+        ...(row.amount !== null && { amount: Number(row.amount) }),
+        ...(row.google_event_id !== null && { googleEventId: row.google_event_id }),
+        ...(row.last_error !== null && { lastError: row.last_error }),
+      }),
+    );
+  }
+
+  async saveReminders(userId: string, reminders: Omit<Reminder, "id">[]) {
+    if (reminders.length === 0) return [];
+    const { data, error } = await this.client
+      .from("reminders")
+      .upsert(
+        reminders.map((r) => ({
+          user_id: userId,
+          bill_id: r.billId,
+          reference_month: r.referenceMonth,
+          effective_date: r.effectiveDate,
+          title: r.title,
+          amount: r.amount ?? null,
+          tags: r.tags,
+          sync_status: r.syncStatus,
+          google_event_id: r.googleEventId ?? null,
+          last_error: r.lastError ?? null,
+        })),
+        // Duas aberturas simultâneas não duplicam o Lembrete do mesmo Vencimento.
+        { onConflict: "bill_id,reference_month", ignoreDuplicates: true },
+      )
+      .select("id");
+    if (error) throw error;
+    return (await this.listReminders(userId)).filter((r) => data?.some((d) => d.id === r.id));
+  }
+
+  async updateReminder(
+    userId: string,
+    id: string,
+    patch: Partial<Pick<Reminder, "syncStatus" | "googleEventId" | "lastError">>,
+  ) {
+    const columns: Record<string, unknown> = {};
+    if ("syncStatus" in patch) columns.sync_status = patch.syncStatus;
+    if ("googleEventId" in patch) columns.google_event_id = patch.googleEventId ?? null;
+    if ("lastError" in patch) columns.last_error = patch.lastError ?? null;
+    const { error } = await this.client.from("reminders").update(columns).eq("user_id", userId).eq("id", id);
+    if (error) throw error;
+  }
+
+  async deleteReminder(userId: string, id: string) {
+    const { error } = await this.client.from("reminders").delete().eq("user_id", userId).eq("id", id);
+    if (error) throw error;
+  }
+
+  async isAccessRevoked(userId: string) {
+    const { data, error } = await this.client
+      .from("user_settings")
+      .select("access_revoked")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) throw error;
+    return data?.access_revoked ?? false;
+  }
+
+  async setAccessRevoked(userId: string, revoked: boolean) {
+    const { error } = await this.client
+      .from("user_settings")
+      .upsert({ user_id: userId, access_revoked: revoked }, { onConflict: "user_id" });
+    if (error) throw error;
   }
 }

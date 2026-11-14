@@ -3,9 +3,13 @@ import { AccountMenu } from "@/components/AccountMenu";
 import { CommandBar } from "@/components/CommandBar";
 import { DayTimeline } from "@/components/DayTimeline";
 import { MonthCalendar } from "@/components/MonthCalendar";
+import { PendingRemindersNotice } from "@/components/PendingRemindersNotice";
 import { SaoPauloClock } from "@/core/clock";
 import { getMonth } from "@/core/commands";
 import { ensureBillsCalendar } from "@/core/ensure-bills-calendar";
+import { syncOnAppOpen } from "@/core/reminders";
+import type { SyncStatus } from "@/core/reminders";
+import { appUrl } from "@/infra/app-url";
 import { GoogleCalendarGateway } from "@/infra/google-calendar-gateway";
 import { createUserClient } from "@/infra/supabase";
 import { SupabaseRepository } from "@/infra/supabase-repository";
@@ -18,6 +22,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
   const { name, year } = monthLabel(month);
 
   const calendarFailed = await retryMissingBillsCalendar();
+  const sync = await syncReminders(clock);
   const days = await loadMonth(month, clock);
   const today = clock.today();
   const selected = d?.startsWith(month) && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : today.startsWith(month) ? today : `${month}-01`;
@@ -33,6 +38,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
             <Link href="/login" className="font-semibold underline">Entre de novo com o Google</Link> e, na tela de consentimento, marque a permissão do Google Calendar.
           </p>
         )}
+        {sync?.accessRevoked && (
+          <p role="alert" className="rounded-[22px] bg-surface px-4 py-3 text-sm">
+            O Google recusou o acesso à sua agenda, e os lembretes estão parados.{" "}
+            <Link href="/login" className="font-semibold underline">Reconecte a sua conta Google</Link> para enviá-los.
+          </p>
+        )}
+        {sync && !sync.accessRevoked && sync.pendingCount > 0 && <PendingRemindersNotice count={sync.pendingCount} />}
         <header className="flex flex-wrap items-end justify-between gap-3">
           <h1 className="display text-[clamp(52px,11vw,120px)] uppercase">
             {name} <span className="ml-1 text-[0.4em] text-muted">{year}</span>
@@ -80,4 +92,21 @@ async function loadMonth(month: string, clock: SaoPauloClock) {
   if (!data.user) return {};
   const repository = new SupabaseRepository(supabase);
   return (await getMonth({ repository, clock }, data.user.id, month)).days;
+}
+
+/** Estende a Janela de lembretes e retoma os pendentes. null = Usuário sem sessão ou falha inesperada. */
+async function syncReminders(clock: SaoPauloClock): Promise<SyncStatus | null> {
+  const supabase = await createUserClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) return null;
+  try {
+    const repository = new SupabaseRepository(supabase);
+    return await syncOnAppOpen(
+      { repository, calendar: new GoogleCalendarGateway(), clock, appUrl: appUrl() },
+      data.user.id,
+    );
+  } catch (e) {
+    console.error("Falha ao sincronizar os Lembretes", e);
+    return null;
+  }
 }

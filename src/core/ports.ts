@@ -1,4 +1,4 @@
-import type { BillRule, Draft } from "./domain";
+import type { BillRule, Draft, Reminder } from "./domain";
 
 export interface Repository {
   getBillsCalendarId(userId: string): Promise<string | null>;
@@ -11,6 +11,37 @@ export interface Repository {
   /** Salva a Conta (e a sua primeira revisão) e devolve o id. */
   saveBill(userId: string, rule: Omit<BillRule, "id">): Promise<string>;
   listBills(userId: string): Promise<BillRule[]>;
+  listReminders(userId: string): Promise<Reminder[]>;
+  saveReminders(userId: string, reminders: Omit<Reminder, "id">[]): Promise<Reminder[]>;
+  updateReminder(
+    userId: string,
+    id: string,
+    patch: Partial<Pick<Reminder, "syncStatus" | "googleEventId" | "lastError">>,
+  ): Promise<void>;
+  deleteReminder(userId: string, id: string): Promise<void>;
+  /** true quando o Google recusou a autenticação e o Usuário precisa reconectar. */
+  isAccessRevoked(userId: string): Promise<boolean>;
+  setAccessRevoked(userId: string, revoked: boolean): Promise<void>;
+}
+
+/** O evento de um Lembrete, como o Calendar o recebe. Data e hora são locais em `timeZone`. */
+export type ReminderEvent = {
+  summary: string;
+  description: string;
+  /** `YYYY-MM-DDTHH:mm:ss` */
+  start: string;
+  end: string;
+  timeZone: string;
+  /** Minutos antes do início em que o pop-up dispara. */
+  popupMinutesBefore: number;
+};
+
+/** O Google recusou a autenticação (token revogado ou expirado): o Usuário precisa reconectar. */
+export class GoogleAuthError extends Error {
+  constructor(message = "Acesso ao Google revogado") {
+    super(message);
+    this.name = "GoogleAuthError";
+  }
 }
 
 export interface CalendarGateway {
@@ -19,6 +50,11 @@ export interface CalendarGateway {
   /** false quando o Usuário apagou a agenda no Google. */
   billsCalendarExists(userId: string, calendarId: string): Promise<boolean>;
   deleteBillsCalendar(userId: string, calendarId: string): Promise<void>;
+  /** Cria o evento do Lembrete e devolve o id dele. Lança `GoogleAuthError` se o acesso foi revogado. */
+  createReminder(userId: string, calendarId: string, event: ReminderEvent): Promise<string>;
+  updateReminder(userId: string, calendarId: string, eventId: string, event: ReminderEvent): Promise<void>;
+  /** Não falha se o evento já não existe. */
+  deleteReminder(userId: string, calendarId: string, eventId: string): Promise<void>;
 }
 
 /** Devolve null quando o Comando não foi entendido. */

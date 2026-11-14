@@ -84,3 +84,23 @@ export type Preview = Draft & {
   /** Última Data de vencimento, inclusiva; ausente numa Conta fixa (só para exibição). */
   endDate?: string;
 };
+
+export type ReminderSyncStatus = "synced" | "pending_create" | "pending_update" | "pending_delete";
+
+/** Lembrete: o evento do Google Calendar que representa um Vencimento. O conteúdo é guardado para as novas tentativas. */
+export type Reminder = {
+  id: string;
+  billId: string;
+  /** `YYYY-MM` do Vencimento que o Lembrete representa. */
+  referenceMonth: string;
+  /** Dia do evento: a Data efetiva do Vencimento. */
+  effectiveDate: string;
+  title: string;
+  amount?: number;
+  tags: Tag[];
+  syncStatus: ReminderSyncStatus;
+  /** Id do evento no Google; ausente até a criação dar certo. */
+  googleEventId?: string;
+  /** Último erro ao falar com o Google; some quando o Lembrete sincroniza. */
+  lastError?: string;
+};
