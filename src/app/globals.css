@@ -25,24 +25,24 @@
   --shadow-xl: 0 10px 32px rgba(0, 0, 0, 0.15), 0 40px 40px rgba(0, 0, 0, 0.04);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b0f08;
-    --surface: #121a0c;
-    --surface-2: #1b2813;
-    --ink: #f4f8ef;
-    --text: #c9d1c2;
-    --muted: #8b9684;
-    --brand: #9fe870;
-    --soft: #1f3a0f;
-    --soft-ink: #cdf3b4;
-    --late: #6e1f24;
-    --danger: #ff6b70;
-    --danger-soft: #3a1618;
-    --border: rgba(244, 248, 239, 0.14);
-    --shadow-lg: 0 6px 20px rgba(0, 0, 0, 0.5);
-    --shadow-xl: 0 10px 32px rgba(0, 0, 0, 0.6);
-  }
+/* O tema vem de html[data-theme], definido pelo script do <head> e pelo ThemeProvider (Claro, Escuro ou Sistema). */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b0f08;
+  --surface: #121a0c;
+  --surface-2: #1b2813;
+  --ink: #f4f8ef;
+  --text: #c9d1c2;
+  --muted: #8b9684;
+  --brand: #9fe870;
+  --soft: #1f3a0f;
+  --soft-ink: #cdf3b4;
+  --late: #6e1f24;
+  --danger: #ff6b70;
+  --danger-soft: #3a1618;
+  --border: rgba(244, 248, 239, 0.14);
+  --shadow-lg: 0 6px 20px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 10px 32px rgba(0, 0, 0, 0.6);
 }
 
 @theme inline {

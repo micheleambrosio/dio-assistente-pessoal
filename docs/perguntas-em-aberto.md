@@ -9,3 +9,5 @@ O protótipo da tela principal ([especificação](design/tela-principal.md)) def
 ## Resolvidas
 
 - **Layout da tela principal:** resolvido com um protótipo, pela variação B "Agenda". Ver [design/tela-principal.md](design/tela-principal.md).
+- **Sair revoga o Google Calendar?** Não. Sair só encerra a sessão; `google_connections` e as Contas ficam, para o Usuário voltar sem reautorizar (o login seguinte renova o `refresh_token`).
+- **O tema segue o Usuário entre aparelhos?** Não no MVP: a preferência (Claro, Escuro ou Sistema) fica no `localStorage` do navegador.
