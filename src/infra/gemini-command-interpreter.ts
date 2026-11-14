@@ -3,7 +3,7 @@ import { TAGS } from "@/core/domain";
 import type { Draft } from "@/core/domain";
 import type { CommandInterpreter } from "@/core/ports";
 
-const MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+const MODEL = process.env.GEMINI_MODEL ?? "gemini-3.8-flash";
 
 const RESPONSE_SCHEMA = {
   type: "object",
