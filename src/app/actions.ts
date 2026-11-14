@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { SaoPauloClock } from "@/core/clock";
 import { confirmPreview, correctPreview, interpretCommand, interpretVoiceCommand } from "@/core/commands";
 import type { ConfirmResult, PreviewResult } from "@/core/commands";
 import type { Preview } from "@/core/domain";
@@ -9,26 +8,13 @@ import { togglePaid } from "@/core/payments";
 import type { TogglePaidInput, TogglePaidResult } from "@/core/payments";
 import { syncOnAppOpen } from "@/core/reminders";
 import type { SyncStatus } from "@/core/reminders";
-import { appUrl } from "@/infra/app-url";
-import { GoogleCalendarGateway } from "@/infra/google-calendar-gateway";
-import { GeminiCommandInterpreter } from "@/infra/gemini-command-interpreter";
-import { createUserClient } from "@/infra/supabase";
-import { SupabaseRepository } from "@/infra/supabase-repository";
+import { getRuntime } from "@/infra/runtime";
 
 async function context() {
-  const supabase = await createUserClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) throw new Error("Não autenticado");
-  return {
-    userId: data.user.id,
-    deps: {
-      repository: new SupabaseRepository(supabase),
-      interpreter: new GeminiCommandInterpreter(),
-      clock: new SaoPauloClock(),
-      calendar: new GoogleCalendarGateway(),
-      appUrl: appUrl(),
-    },
-  };
+  const runtime = await getRuntime();
+  if (!runtime) throw new Error("Não autenticado");
+  const { userId, ...deps } = runtime;
+  return { userId, deps };
 }
 
 export type CommandFailure = { ok: false; error: "not_understood" | "invalid_preview" | "invalid_audio" | "unavailable" };

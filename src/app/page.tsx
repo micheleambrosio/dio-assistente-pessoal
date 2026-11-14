@@ -10,19 +10,16 @@ import { OverdueTimeline } from "@/components/OverdueTimeline";
 import { MonthNav } from "@/components/MonthNav";
 import { MonthSkeleton } from "@/components/MonthSkeleton";
 import { PendingRemindersNotice } from "@/components/PendingRemindersNotice";
-import { SaoPauloClock } from "@/core/clock";
+import type { Clock } from "@/core/ports";
 import { getMonth } from "@/core/commands";
 import { ensureBillsCalendar } from "@/core/ensure-bills-calendar";
 import { syncOnAppOpen } from "@/core/reminders";
 import type { SyncStatus } from "@/core/reminders";
-import { appUrl } from "@/infra/app-url";
-import { GoogleCalendarGateway } from "@/infra/google-calendar-gateway";
-import { createUserClient } from "@/infra/supabase";
-import { SupabaseRepository } from "@/infra/supabase-repository";
+import { getClock, getRuntime } from "@/infra/runtime";
 import { isMonth, monthLabel, shiftMonth } from "@/lib/month";
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ m?: string; d?: string }> }) {
-  const clock = new SaoPauloClock();
+  const clock = getClock();
   const { m, d } = await searchParams;
   const month = isMonth(m) ? m : clock.currentMonth();
   const { name, year } = monthLabel(month);
@@ -52,7 +49,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
   );
 }
 
-async function MonthBody({ month, day, clock }: { month: string; day?: string; clock: SaoPauloClock }) {
+async function MonthBody({ month, day, clock }: { month: string; day?: string; clock: Clock }) {
   const view = await loadMonth(month, clock);
   const days = view?.days ?? {};
   const today = clock.today();
@@ -70,7 +67,7 @@ async function MonthBody({ month, day, clock }: { month: string; day?: string; c
   );
 }
 
-async function Notices({ clock }: { clock: SaoPauloClock }) {
+async function Notices({ clock }: { clock: Clock }) {
   const calendarFailed = await retryMissingBillsCalendar();
   const sync = await syncReminders(clock);
   return (
@@ -94,15 +91,14 @@ async function Notices({ clock }: { clock: SaoPauloClock }) {
 
 /** Se o login não conseguiu criar a Agenda de contas, tenta de novo ao abrir o app. true = falhou. */
 async function retryMissingBillsCalendar() {
-  const supabase = await createUserClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) return false;
+  const runtime = await getRuntime();
+  if (!runtime) return false;
 
-  const repository = new SupabaseRepository(supabase);
-  if (await repository.getBillsCalendarId(data.user.id)) return false;
+  const { repository, calendar, userId } = runtime;
+  if (await repository.getBillsCalendarId(userId)) return false;
 
   try {
-    await ensureBillsCalendar({ repository, calendar: new GoogleCalendarGateway() }, data.user.id);
+    await ensureBillsCalendar({ repository, calendar }, userId);
     return false;
   } catch (e) {
     console.error("Falha ao criar a Agenda de contas", e);
@@ -110,24 +106,20 @@ async function retryMissingBillsCalendar() {
   }
 }
 
-async function loadMonth(month: string, clock: SaoPauloClock) {
-  const supabase = await createUserClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) return null;
-  const repository = new SupabaseRepository(supabase);
-  return getMonth({ repository, clock }, data.user.id, month);
+async function loadMonth(month: string, clock: Clock) {
+  const runtime = await getRuntime();
+  if (!runtime) return null;
+  return getMonth({ repository: runtime.repository, clock }, runtime.userId, month);
 }
 
 /** Estende a Janela de lembretes e retoma os pendentes. null = Usuário sem sessão ou falha inesperada. */
-async function syncReminders(clock: SaoPauloClock): Promise<SyncStatus | null> {
-  const supabase = await createUserClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) return null;
+async function syncReminders(clock: Clock): Promise<SyncStatus | null> {
+  const runtime = await getRuntime();
+  if (!runtime) return null;
   try {
-    const repository = new SupabaseRepository(supabase);
     return await syncOnAppOpen(
-      { repository, calendar: new GoogleCalendarGateway(), clock, appUrl: appUrl() },
-      data.user.id,
+      { repository: runtime.repository, calendar: runtime.calendar, clock, appUrl: runtime.appUrl },
+      runtime.userId,
     );
   } catch (e) {
     console.error("Falha ao sincronizar os Lembretes", e);

@@ -2,6 +2,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  // Testes de ponta a ponta: o Usuário é o de teste, sem Supabase.
+  if (process.env.E2E_FAKES === "1" && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === "e2e") return NextResponse.next();
   let response = NextResponse.next({ request });
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

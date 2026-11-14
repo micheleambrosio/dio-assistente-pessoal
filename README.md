@@ -18,4 +18,9 @@ Next.js (App Router) + TypeScript, Supabase, Tailwind e Ant Design. Ver `CLAUDE.
 
 ## Comandos
 
-`pnpm test` · `pnpm typecheck` · `pnpm build`
+`pnpm test` · `pnpm typecheck` · `pnpm build` · `pnpm test:e2e` · `pnpm eval:interpreter`
+
+## Qualidade
+
+- **Ponta a ponta (`pnpm test:e2e`)**: Playwright em `e2e/`, em light e dark, mobile e desktop. O servidor sobe com `E2E_FAKES=1` (ver `src/infra/runtime.ts`): portas falsas, `Clock` fixo em 12/06/2025 e os dados do protótipo (`src/core/fakes/prototype-seed.ts`), sem Supabase, Google nem Gemini. Roda no CI. Na primeira vez: `pnpm exec playwright install chromium`.
+- **Avaliação do Interpretador (`pnpm eval:interpreter`)**: frases fixas em pt-BR com a saída esperada (`evals/interpreter/cases.ts`), contra o Gemini de verdade. **Sob demanda, fora do CI**: usa `GEMINI_API_KEY` (de `.env.local`) e gasta chamadas reais. Reporta a taxa de acerto por intenção e por campo; `--intent=<x>` roda uma intenção, `--verbose` mostra esperado × recebido e `--min=0.9` falha abaixo da taxa.
