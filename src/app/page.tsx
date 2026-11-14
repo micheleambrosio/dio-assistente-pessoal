@@ -35,7 +35,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
           <Notices clock={clock} />
         </Suspense>
         <header className="flex flex-wrap items-end justify-between gap-3">
-          <h1 className="display text-[clamp(52px,11vw,120px)] uppercase">
+          <h1 key={month} className="display month-in text-[clamp(52px,11vw,120px)] uppercase">
             {name} <span className="ml-1 text-[0.4em] text-muted">{year}</span>
           </h1>
           <div className="flex items-center gap-2">
@@ -58,7 +58,7 @@ async function MonthBody({ month, day, clock }: { month: string; day?: string; c
   const today = clock.today();
   const selected = day?.startsWith(month) && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : today.startsWith(month) ? today : `${month}-01`;
   return (
-    <>
+    <div className="month-in flex flex-col gap-4">
       {view && <MonthSummary summary={view.summary} occurrences={view.referenceOccurrences} />}
       <MonthCalendar month={month} today={today} selected={selected} days={days} />
       {/* Atrasadas é global e fica ao lado do dia (desktop) ou acima dele (mobile). */}
@@ -66,7 +66,7 @@ async function MonthBody({ month, day, clock }: { month: string; day?: string; c
         <OverdueTimeline occurrences={view?.overdue ?? []} />
         <DayTimeline date={selected} today={today} occurrences={days[selected] ?? []} />
       </div>
-    </>
+    </div>
   );
 }
 

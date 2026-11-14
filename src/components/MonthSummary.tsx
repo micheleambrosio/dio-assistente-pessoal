@@ -4,7 +4,8 @@ import { Drawer } from "antd";
 import { useEffect, useRef, useState } from "react";
 import type { Occurrence } from "@/core/domain";
 import type { MonthSummary as Summary } from "@/core/month-summary";
-import { formatDate, formatMoney } from "@/lib/labels";
+import { formatMoney } from "@/lib/labels";
+import { OccurrenceRow } from "./OccurrenceRow";
 
 /** Conta de 0 até o valor (e de um valor ao outro) em ~700 ms; sem animação se o Usuário prefere menos movimento. */
 function useCountUp(target: number) {
@@ -49,58 +50,92 @@ export function MonthSummary({ summary, occurrences }: { summary: Summary; occur
     return () => cancelAnimationFrame(id);
   }, [ratio]);
 
-  const label = "text-[11px] font-semibold uppercase tracking-wide text-muted";
-  const number = "text-xl font-extrabold tabular-nums text-ink sm:text-2xl";
-  const card = "flex flex-col gap-1 rounded-[22px] bg-surface p-4 text-left transition hover:brightness-95";
+  const [wide, setWide] = useState(true);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const update = () => setWide(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  const tile = "flex flex-col rounded-[24px] p-4 text-left transition duration-200 hover:-translate-y-[3px] active:scale-[0.97] motion-reduce:transition-none";
+  const caption = "text-xs font-semibold opacity-70";
+  const value = "mt-1 text-xl font-extrabold tabular-nums sm:text-2xl";
   const openDrawer = () => setOpen(true);
 
   return (
     <>
       {count === 0 ? (
-        <button type="button" onClick={openDrawer} aria-label="Resumo do mês: ver os Vencimentos do mês" className={`${card} items-center`}>
-          <span className="text-sm font-semibold text-muted">Mês vazio</span>
+        <button type="button" onClick={openDrawer} aria-label="Resumo do mês: ver os Vencimentos do mês" className={`${tile} items-center bg-surface text-muted`}>
+          <span className="text-sm font-semibold">Mês vazio</span>
         </button>
       ) : (
-        <section aria-label="Resumo do mês" className="flex flex-col gap-2">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
-            <button type="button" onClick={openDrawer} className={card} aria-label="Pago: ver os Vencimentos do mês">
-              <span className={label}>Pago</span>
-              <span className={number}><Money value={paidTotal} /></span>
+        <section aria-label="Resumo do mês">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <button type="button" onClick={openDrawer} className={`${tile} bg-lime text-limeink`}>
+              <span className={caption}>Pago</span>
+              <span className={value}><Money value={paidTotal} /></span>
             </button>
-            <button type="button" onClick={openDrawer} className={card} aria-label="A pagar: ver os Vencimentos do mês">
-              <span className={label}>A pagar</span>
-              <span className={number}><Money value={toPayTotal} /></span>
-              {overdueTotal > 0 && <span className="text-xs font-semibold text-danger">{formatMoney(overdueTotal)} em atraso</span>}
+            <button type="button" onClick={openDrawer} className={`${tile} bg-dark text-darkink`}>
+              <span className={caption}>{overdueTotal > 0 ? `A pagar · ${formatMoney(overdueTotal)} em atraso` : "A pagar"}</span>
+              <span className={value}><Money value={toPayTotal} /></span>
             </button>
-            <button type="button" onClick={openDrawer} className={card} aria-label="Total: ver os Vencimentos do mês">
-              <span className={label}>Total</span>
-              <span className={number}><Money value={total} /></span>
+            <button type="button" onClick={openDrawer} className={`${tile} bg-surface text-ink`}>
+              <span className={caption}>Total</span>
+              <span className={value}><Money value={total} /></span>
             </button>
-            <button type="button" onClick={openDrawer} className={card} aria-label="Progresso: ver os Vencimentos do mês">
-              <span className={label}>Progresso</span>
-              <span className={number}>
-                <Count value={paidCount} /> de {count} {count === 1 ? "paga" : "pagas"}
-              </span>
-              <span
-                role="progressbar"
-                aria-label="Progresso do mês"
-                aria-valuemin={0}
-                aria-valuemax={count}
-                aria-valuenow={paidCount}
-                className="mt-1 block h-2 overflow-hidden rounded-full bg-surface2"
-              >
-                <span className="block h-full rounded-full bg-brand transition-[width] duration-700 ease-out motion-reduce:transition-none" style={{ width: `${fill * 100}%` }} />
+            <button type="button" onClick={openDrawer} className={`${tile} bg-surface text-ink`}>
+              <span className={caption}>Progresso</span>
+              <span className="mt-1 flex items-center gap-3">
+                <svg
+                  role="progressbar"
+                  aria-label="Progresso do mês"
+                  aria-valuemin={0}
+                  aria-valuemax={count}
+                  aria-valuenow={paidCount}
+                  width="38"
+                  height="38"
+                  viewBox="0 0 40 40"
+                  className="-rotate-90 shrink-0"
+                >
+                  <circle cx="20" cy="20" r="16" fill="none" stroke="var(--surface-2)" strokeWidth="6" />
+                  <circle
+                    cx="20"
+                    cy="20"
+                    r="16"
+                    fill="none"
+                    stroke="var(--brand)"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeDasharray={100.5}
+                    strokeDashoffset={100.5 * (1 - fill)}
+                    className="transition-[stroke-dashoffset] duration-[800ms] ease-out motion-reduce:transition-none"
+                  />
+                </svg>
+                <span className="text-sm font-bold leading-tight">
+                  <Count value={paidCount} /> de {count} {count === 1 ? "paga" : "pagas"}
+                </span>
               </span>
             </button>
           </div>
-          {withoutAmountCount > 0 && (
-            <p className="px-2 text-xs text-muted">
-              +{withoutAmountCount} {withoutAmountCount === 1 ? "conta sem valor" : "contas sem valor"}
-            </p>
-          )}
+          <p className="mt-2 px-2 text-xs text-muted">
+            {withoutAmountCount > 0 && (
+              <>+{withoutAmountCount} {withoutAmountCount === 1 ? "conta sem valor" : "contas sem valor"} · </>
+            )}
+            toque nos números para ver todos os Vencimentos
+          </p>
         </section>
       )}
-      <Drawer title="Contas do mês" open={open} onClose={() => setOpen(false)} placement="right" width={420}>
+      <Drawer
+        title="Vencimentos do mês"
+        open={open}
+        onClose={() => setOpen(false)}
+        placement={wide ? "right" : "bottom"}
+        width={wide ? 460 : undefined}
+        height={wide ? undefined : "78%"}
+        styles={{ body: { background: "var(--bg)" }, header: { background: "var(--bg)" } }}
+      >
         {occurrences.length === 0 ? (
           <p className="text-sm text-muted">Mês vazio</p>
         ) : (
@@ -114,22 +149,17 @@ export function MonthSummary({ summary, occurrences }: { summary: Summary; occur
   );
 }
 
+/** Os mesmos cartões da lista do dia, com o check: dá para marcar e desmarcar daqui. */
 function DrawerList({ title, items, empty }: { title: string; items: Occurrence[]; empty: string }) {
   return (
     <section aria-label={title}>
-      <h3 className="mb-2 text-sm font-extrabold text-ink">{title} <span className="font-medium text-muted">{items.length}</span></h3>
+      <h4 className="mb-2 text-sm font-bold text-ink">{title} · {items.length}</h4>
       {items.length === 0 ? (
         <p className="text-sm text-muted">{empty}</p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-2">
           {items.map((o) => (
-            <li key={o.billId + o.referenceMonth} className="flex items-center justify-between gap-3 rounded-2xl bg-surface px-3 py-2 text-sm">
-              <span className="min-w-0">
-                <span className={`block truncate font-semibold ${o.isOverdue ? "text-danger" : "text-ink"}`}>{o.title}</span>
-                <span className="text-xs text-muted">{formatDate(o.effectiveDate).slice(0, 5)}{o.isOverdue && " · atrasada"}</span>
-              </span>
-              <span className="font-bold tabular-nums text-ink">{o.amount !== undefined ? formatMoney(o.amount) : "sem valor"}</span>
-            </li>
+            <OccurrenceRow key={o.billId + o.referenceMonth} occurrence={o} showDate />
           ))}
         </ul>
       )}

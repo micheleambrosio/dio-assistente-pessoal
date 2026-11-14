@@ -48,6 +48,20 @@ describe("Atrasado", () => {
     expect(nextDay.overdue.map((o) => o.effectiveDate)).toEqual(["2025-01-10"]);
   });
 
+  it("desmarcar o Pago de um Vencimento de hoje não o torna Atrasado, nem o duplica", async () => {
+    const { deps, on } = setup("2025-01-01");
+    const billId = await register(deps, bill("Luz", 10, 100));
+    const today = on("2025-01-10");
+    await togglePaid(today, USER, { billId, referenceMonth: "2025-01", paid: true });
+
+    await togglePaid(today, USER, { billId, referenceMonth: "2025-01", paid: false });
+
+    const view = await getMonth(today, USER, "2025-01");
+    expect(view.days["2025-01-10"][0]).toMatchObject({ isPaid: false, isOverdue: false });
+    expect(view.overdue).toEqual([]);
+    expect(view.summary).toMatchObject({ overdueTotal: 0, toPayTotal: 100 });
+  });
+
   it("Pago deixa de ser Atrasado", async () => {
     const { deps, on } = setup("2025-01-01");
     const billId = await register(deps, bill("Luz", 10, 100));

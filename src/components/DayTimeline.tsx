@@ -1,6 +1,7 @@
 import type { Occurrence } from "@/core/domain";
 import { monthLabel } from "@/lib/month";
 import { OccurrenceRow } from "./OccurrenceRow";
+import { Timeline, TimelineItem } from "./Timeline";
 
 const WEEKDAYS = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 
@@ -22,11 +23,13 @@ export function DayTimeline({ date, today, occurrences }: { date: string; today:
           Nenhuma Conta vence neste dia
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <Timeline>
           {occurrences.map((o, i) => (
-            <OccurrenceRow key={o.billId + o.referenceMonth} occurrence={o} highlight={i === firstPaid} />
+            <TimelineItem key={o.billId + o.referenceMonth} index={i} dot={o.isPaid ? "paid" : o.isOverdue ? "late" : "open"}>
+              <OccurrenceRow occurrence={o} highlight={i === firstPaid} />
+            </TimelineItem>
           ))}
-        </ul>
+        </Timeline>
       )}
     </section>
   );

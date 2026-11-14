@@ -1,5 +1,6 @@
 import type { Occurrence } from "@/core/domain";
 import { OccurrenceRow } from "./OccurrenceRow";
+import { Timeline, TimelineItem } from "./Timeline";
 
 /** Atrasadas: global, na mesma estrutura do dia. Só existe enquanto há algum Atrasado. */
 export function OverdueTimeline({ occurrences }: { occurrences: Occurrence[] }) {
@@ -13,11 +14,13 @@ export function OverdueTimeline({ occurrences }: { occurrences: Occurrence[] }) 
         Atrasadas
         <span className="text-sm font-medium text-muted">{occurrences.length}</span>
       </h2>
-      <ul className="flex flex-col gap-2">
-        {occurrences.map((o) => (
-          <OccurrenceRow key={o.billId + o.referenceMonth} occurrence={o} showDate />
+      <Timeline>
+        {occurrences.map((o, i) => (
+          <TimelineItem key={o.billId + o.referenceMonth} index={i} dot="late">
+            <OccurrenceRow occurrence={o} showDate />
+          </TimelineItem>
         ))}
-      </ul>
+      </Timeline>
     </section>
   );
 }

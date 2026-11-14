@@ -18,7 +18,7 @@ function chipStyle(o: Occurrence, dayHasOverdue: boolean) {
 }
 
 function dotStyle(o: Occurrence) {
-  if (o.isOverdue) return "bg-danger";
+  if (o.isOverdue) return "blink bg-danger";
   return o.isPaid ? "bg-muted/50" : "bg-brand";
 }
 

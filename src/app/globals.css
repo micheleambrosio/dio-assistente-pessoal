@@ -133,6 +133,22 @@ body {
   animation: check-out 0.3s ease-in both;
 }
 
+/* Entrada dos itens da linha do tempo e do mês (o protótipo usa spring; aqui, uma curva com leve ultrapasse). */
+@keyframes timeline-in {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.timeline-in {
+  animation: timeline-in 0.4s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+@keyframes month-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.month-in {
+  animation: month-in 0.25s ease-out both;
+}
+
 /* Alerta das Atrasadas. */
 @keyframes blink {
   50% { opacity: 0.25; }
@@ -145,6 +161,8 @@ body {
   .check-draw,
   .check-pop,
   .check-out,
+  .timeline-in,
+  .month-in,
   .blink {
     animation: none;
   }
