@@ -1,4 +1,4 @@
-import type { BillRule, Draft, OccurrenceState, Reminder } from "./domain";
+import type { AudioInput, BillRule, Draft, OccurrenceState, Reminder } from "./domain";
 
 export interface Repository {
   getBillsCalendarId(userId: string): Promise<string | null>;
@@ -63,6 +63,8 @@ export interface CalendarGateway {
 /** Devolve null quando o Comando não foi entendido. */
 export interface CommandInterpreter {
   interpret(text: string, today: string): Promise<Draft | null>;
+  /** Transcreve e interpreta o áudio numa única chamada. Devolve null quando não foi entendido. */
+  interpretAudio(audio: AudioInput, today: string): Promise<{ draft: Draft; transcript: string } | null>;
   /** Aplica uma correção em linguagem natural ("não, é dia 16") ao que já foi entendido. */
   correct(previous: Draft, correction: string, today: string): Promise<Draft | null>;
 }

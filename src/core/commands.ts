@@ -1,7 +1,7 @@
 import { shiftMonth, isMonth } from "@/lib/month";
 import { dueDateIn } from "./business-calendar";
 import { RECURRENCES, TAGS } from "./domain";
-import type { BillRule, Draft, Occurrence, Preview, Tag } from "./domain";
+import type { AudioInput, BillRule, Draft, Occurrence, Preview, Tag } from "./domain";
 import { summarize } from "./month-summary";
 import type { MonthSummary } from "./month-summary";
 import { occurrencesBetween } from "./occurrences";
@@ -11,9 +11,12 @@ import { createRemindersForBill } from "./reminders";
 type Deps = { repository: Repository; interpreter: CommandInterpreter; clock: Clock };
 type ConfirmDeps = Deps & { calendar: CalendarGateway; appUrl: string };
 
+/** 30 s de áudio compactado ficam bem abaixo disto; o teto barra envios abusivos antes de gastar IA. */
+export const MAX_AUDIO_BYTES = 1_000_000;
+
 export type PreviewResult =
   | { ok: true; preview: Preview }
-  | { ok: false; error: "not_understood" | "invalid_preview" };
+  | { ok: false; error: "not_understood" | "invalid_preview" | "invalid_audio" };
 
 export type ConfirmResult = { ok: true; billId: string } | { ok: false; error: "invalid_preview" };
 
@@ -33,6 +36,19 @@ export async function interpretCommand(deps: Deps, _userId: string, text: string
   return draft ? buildPreview(draft, text, deps.clock.today()) : { ok: false, error: "not_understood" };
 }
 
+/** Comando falado: o áudio vai à IA, que transcreve e interpreta de uma vez. A Prévia mostra a transcrição. */
+export async function interpretVoiceCommand(deps: Deps, _userId: string, audio: AudioInput): Promise<PreviewResult> {
+  if (audio.data.byteLength === 0 || audio.data.byteLength > MAX_AUDIO_BYTES || !audio.mimeType.startsWith("audio/")) {
+    return { ok: false, error: "invalid_audio" };
+  }
+  const today = deps.clock.today();
+  const result = await deps.interpreter.interpretAudio(audio, today);
+  const draft = parseDraft(result?.draft);
+  const transcript = result?.transcript?.trim();
+  if (!draft || !transcript) return { ok: false, error: "not_understood" };
+  return buildPreview(draft, transcript.slice(0, 500), today, "voice");
+}
+
 export async function correctPreview(
   deps: Deps,
   _userId: string,
@@ -44,7 +60,7 @@ export async function correctPreview(
 
   const today = deps.clock.today();
   const draft = parseDraft(await deps.interpreter.correct(previous.draft, correction, today));
-  return draft ? buildPreview(draft, previous.originalText, today) : { ok: false, error: "not_understood" };
+  return draft ? buildPreview(draft, previous.originalText, today, previous.source) : { ok: false, error: "not_understood" };
 }
 
 /** Valida a Prévia de novo no servidor e só então salva. Datas vêm dos campos, não do cliente. */
@@ -102,10 +118,10 @@ export async function getMonth(
   return { month, days, overdue, referenceOccurrences, summary: summarize(referenceOccurrences) };
 }
 
-function buildPreview(draft: Draft, originalText: string, today: string): PreviewResult {
+function buildPreview(draft: Draft, originalText: string, today: string, source?: "voice"): PreviewResult {
   const dates = resolveDates(draft, today);
   if (!dates) return { ok: false, error: "not_understood" };
-  return { ok: true, preview: { ...draft, action: "create_bill", originalText, ...dates } };
+  return { ok: true, preview: { ...draft, action: "create_bill", ...(source && { source }), originalText, ...dates } };
 }
 
 /** Primeira e última Data de vencimento; null quando o intervalo não faz sentido. */
@@ -151,10 +167,10 @@ function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
-function parsePreview(value: unknown): { draft: Draft; originalText: string } | null {
+function parsePreview(value: unknown): { draft: Draft; originalText: string; source?: "voice" } | null {
   if (!isRecord(value) || value.action !== "create_bill" || typeof value.originalText !== "string") return null;
   const draft = parseDraft(value);
-  return draft ? { draft, originalText: value.originalText } : null;
+  return draft ? { draft, originalText: value.originalText, ...(value.source === "voice" && { source: "voice" as const }) } : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
