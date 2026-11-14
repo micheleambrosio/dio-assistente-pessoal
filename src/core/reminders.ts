@@ -1,6 +1,8 @@
-import { shiftMonth } from "@/lib/month";
 import { TAG_LABELS } from "@/lib/labels";
-import type { BillRule, Reminder } from "./domain";
+import { formatMoneyText } from "@/lib/money";
+import { monthOf, shiftMonth } from "@/lib/month";
+import { isSameOccurrence } from "./domain";
+import type { BillRule, OccurrenceRef, Reminder } from "./domain";
 import { occurrencesBetween } from "./occurrences";
 import { ensureBillsCalendar } from "./ensure-bills-calendar";
 import type { CalendarGateway, Clock, Repository, ReminderEvent } from "./ports";
@@ -9,14 +11,14 @@ import { GoogleAuthError } from "./ports";
 export type ReminderDeps = { repository: Repository; calendar: CalendarGateway; clock: Clock; appUrl: string };
 
 /** Quantos Vencimentos à frente cada Conta mantém no Calendar (ADR 0002). */
-export const WINDOW_SIZE = 12;
-const SEARCH_MONTHS = 12 * WINDOW_SIZE; // alcança 12 Vencimentos até de Contas anuais
+export const REMINDER_WINDOW_SIZE = 12;
+const SEARCH_MONTHS = 12 * REMINDER_WINDOW_SIZE; // alcança 12 Vencimentos até de Contas anuais
 
 const TIME_ZONE = "America/Sao_Paulo";
 
 /**
  * Grava no app os Lembretes que faltam para a Conta e tenta criá-los no Calendar.
- * Nunca lança: o app é a fonte da verdade (ADR 0005) e `syncOnAppOpen` retoma o que falhou.
+ * Nunca lança: o app é a fonte da verdade (ADR 0005) e `syncReminders` retoma o que falhou.
  */
 export async function createRemindersForBill(deps: ReminderDeps, userId: string, rule: BillRule): Promise<void> {
   try {
@@ -30,18 +32,19 @@ export async function createRemindersForBill(deps: ReminderDeps, userId: string,
 async function extendWindow(deps: ReminderDeps, userId: string, rule: BillRule, all: Reminder[]) {
   const today = deps.clock.today();
   const states = await deps.repository.listOccurrenceStates(userId);
-  const mine = all.filter((r) => r.billId === rule.id && r.syncStatus !== "pending_delete");
-  const lastReference = mine.map((r) => r.referenceMonth).sort().at(-1);
-  const lastReminderMonth = mine.map((r) => r.effectiveDate.slice(0, 7)).sort().at(-1);
-  if (lastReminderMonth && today.slice(0, 7) < lastReminderMonth) return; // a Janela ainda tem folga
+  const billReminders = all.filter((r) => r.billId === rule.id && r.syncStatus !== "pending_delete");
+  const lastReference = billReminders.map((r) => r.referenceMonth).sort().at(-1);
+  const lastReminderMonth = billReminders.map((r) => monthOf(r.effectiveDate)).sort().at(-1);
+  if (lastReminderMonth && monthOf(today) < lastReminderMonth) return; // a Janela ainda tem folga
 
-  const firstMonth = lastReference ? shiftMonth(lastReference, 1) : rule.startDate.slice(0, 7);
+  const firstMonth = lastReference ? shiftMonth(lastReference, 1) : monthOf(rule.startDate);
   // O Vencimento do mês anterior pode ter Data efetiva neste mês.
-  const from = [firstMonth, shiftMonth(today.slice(0, 7), -1)].sort().at(-1)!;
+  const from = [firstMonth, shiftMonth(monthOf(today), -1)].sort().at(-1)!;
 
   const fresh = occurrencesBetween(rule, from, shiftMonth(from, SEARCH_MONTHS), today, states)
-    .filter((o) => o.dueDate >= rule.registeredOn && o.effectiveDate >= today)
-    .slice(0, WINDOW_SIZE);
+    // Só o que ainda vai acontecer; como o cadastro é no máximo hoje, isso já exclui o que nasceu Pago.
+    .filter((o) => o.effectiveDate >= today)
+    .slice(0, REMINDER_WINDOW_SIZE);
 
   await deps.repository.saveReminders(
     userId,
@@ -51,7 +54,7 @@ async function extendWindow(deps: ReminderDeps, userId: string, rule: BillRule, 
       effectiveDate: o.effectiveDate,
       title: o.title,
       tags: o.tags,
-      paid: o.isPaid,
+      isPaid: o.isPaid,
       syncStatus: "pending_create" as const,
       ...(o.amount !== undefined && { amount: o.amount }),
     })),
@@ -65,17 +68,16 @@ async function extendWindow(deps: ReminderDeps, userId: string, rule: BillRule, 
 export async function updateReminderForOccurrence(
   deps: ReminderDeps,
   userId: string,
-  billId: string,
-  referenceMonth: string,
-  change: { paid: boolean; amount?: number },
+  ref: OccurrenceRef,
+  change: { isPaid: boolean; amount?: number },
 ): Promise<void> {
   const reminder = (await deps.repository.listReminders(userId)).find(
-    (r) => r.billId === billId && r.referenceMonth === referenceMonth && r.syncStatus !== "pending_delete",
+    (r) => isSameOccurrence(r, ref) && r.syncStatus !== "pending_delete",
   );
   if (!reminder) return;
   // Gravar a pendência no app tem de dar certo; só o Google pode falhar em silêncio.
   await deps.repository.updateReminder(userId, reminder.id, {
-    paid: change.paid,
+    isPaid: change.isPaid,
     ...(change.amount !== undefined && { amount: change.amount }),
     // Um Lembrete que ainda não existe no Google só precisa nascer com o conteúdo novo.
     syncStatus: reminder.syncStatus === "pending_create" ? "pending_create" : "pending_update",
@@ -88,18 +90,19 @@ export async function updateReminderForOccurrence(
 }
 
 /** Depois de o Usuário reconectar a conta Google: limpa o aviso e sincroniza as pendências. */
-export async function reconnectGoogle(deps: ReminderDeps, userId: string): Promise<SyncStatus> {
+export async function reconnectGoogle(deps: ReminderDeps, userId: string): Promise<RemindersSyncSummary> {
   await deps.repository.setAccessRevoked(userId, false);
-  return syncOnAppOpen(deps, userId);
+  return syncReminders(deps, userId);
 }
 
-export type SyncStatus = { pendingCount: number; accessRevoked: boolean };
+/** O que a tela mostra sobre os Lembretes: quantos estão pendentes e se o acesso ao Google caiu. */
+export type RemindersSyncSummary = { pendingCount: number; accessRevoked: boolean };
 
 /**
- * Chamada ao abrir o app (e pela ação "tentar agora"): retoma os Lembretes pendentes
- * e devolve o que a tela precisa mostrar. Nunca lança por causa do Google.
+ * Estende a Janela de lembretes e retoma os pendentes. Roda ao abrir o app, no "Tentar agora"
+ * e ao reconectar. Nunca lança por causa do Google.
  */
-export async function syncOnAppOpen(deps: ReminderDeps, userId: string): Promise<SyncStatus> {
+export async function syncReminders(deps: ReminderDeps, userId: string): Promise<RemindersSyncSummary> {
   try {
     // Grava primeiro no app; o Calendar vem depois (ADR 0005).
     const reminders = await deps.repository.listReminders(userId);
@@ -108,10 +111,10 @@ export async function syncOnAppOpen(deps: ReminderDeps, userId: string): Promise
   } catch {
     // O motivo já foi gravado em cada Lembrete; a tela mostra a contagem.
   }
-  return syncStatus(deps.repository, userId);
+  return summarizeSync(deps.repository, userId);
 }
 
-async function syncStatus(repository: Repository, userId: string): Promise<SyncStatus> {
+async function summarizeSync(repository: Repository, userId: string): Promise<RemindersSyncSummary> {
   const reminders = await repository.listReminders(userId);
   return {
     pendingCount: reminders.filter((r) => r.syncStatus !== "synced").length,
@@ -120,20 +123,19 @@ async function syncStatus(repository: Repository, userId: string): Promise<SyncS
 }
 
 async function pushPending(deps: ReminderDeps, userId: string) {
-  const { repository, calendar } = deps;
+  const { repository } = deps;
   if (await repository.isAccessRevoked(userId)) return;
   if ((await repository.listReminders(userId)).length === 0) return;
 
   // Mesmo sem pendências, confere a Agenda de contas: o Usuário pode ter apagado no Google.
-  const storedId = await repository.getBillsCalendarId(userId);
+  // Se ela for recriada, os Lembretes da Janela já voltam a pendentes.
   let calendarId: string;
   try {
-    calendarId = await ensureBillsCalendar({ repository, calendar }, userId);
+    calendarId = await ensureBillsCalendar(deps, userId);
   } catch (error) {
     await fail(deps, userId, await pendingOf(repository, userId), error);
     return;
   }
-  if (storedId && storedId !== calendarId) await resetAfterRecreation(repository, userId, deps.clock.today());
 
   for (const reminder of await pendingOf(repository, userId)) {
     try {
@@ -147,14 +149,6 @@ async function pushPending(deps: ReminderDeps, userId: string) {
 
 async function pendingOf(repository: Repository, userId: string) {
   return (await repository.listReminders(userId)).filter((r) => r.syncStatus !== "synced");
-}
-
-/** A agenda nova está vazia: recria só os Lembretes da Janela atual (de hoje em diante). */
-async function resetAfterRecreation(repository: Repository, userId: string, today: string) {
-  for (const reminder of await repository.listReminders(userId)) {
-    if (reminder.syncStatus === "pending_delete") await repository.deleteReminder(userId, reminder.id);
-    else if (reminder.effectiveDate >= today) await repository.updateReminder(userId, reminder.id, { syncStatus: "pending_create", googleEventId: undefined });
-  }
 }
 
 async function push(deps: ReminderDeps, userId: string, calendarId: string, reminder: Reminder) {
@@ -188,10 +182,10 @@ function messageOf(error: unknown) {
 }
 
 function eventFor(reminder: Reminder, appUrl: string, today: string): ReminderEvent {
-  const base = reminder.amount === undefined ? reminder.title : `${reminder.title}: ${formatMoney(reminder.amount)}`;
-  const summary = reminder.paid ? `✅ ${base}` : base;
+  const base = reminder.amount === undefined ? reminder.title : `${reminder.title}: ${formatMoneyText(reminder.amount)}`;
+  const summary = reminder.isPaid ? `✅ ${base}` : base;
   // Pago não avisa; depois da Data efetiva também não há mais o que avisar.
-  const notify = !reminder.paid && reminder.effectiveDate >= today;
+  const notify = !reminder.isPaid && reminder.effectiveDate >= today;
   return {
     summary,
     description: `Etiquetas: ${reminder.tags.map((t) => TAG_LABELS[t]).join(", ")}\n${appUrl}`,
@@ -200,8 +194,4 @@ function eventFor(reminder: Reminder, appUrl: string, today: string): ReminderEv
     timeZone: TIME_ZONE,
     popupMinutesBefore: notify ? 0 : null,
   };
-}
-
-function formatMoney(value: number) {
-  return `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

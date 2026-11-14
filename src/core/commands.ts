@@ -1,15 +1,13 @@
-import { shiftMonth, isMonth } from "@/lib/month";
-import { dueDateIn } from "./business-calendar";
-import { RECURRENCES, TAGS } from "./domain";
-import type { AudioInput, BillRule, Draft, Occurrence, Preview, Tag } from "./domain";
-import { summarize } from "./month-summary";
-import type { MonthSummary } from "./month-summary";
-import { occurrencesBetween } from "./occurrences";
-import type { CalendarGateway, Clock, CommandInterpreter, Repository } from "./ports";
+import { isMonth, monthNumberOf, monthOf, shiftMonth, yearOf } from "@/lib/month";
+import { dueDateIn, effectiveDate } from "./business-calendar";
+import { RECURRENCES, TAGS, isValidAmount } from "./domain";
+import type { AudioInput, BillRule, Draft, Preview, Tag } from "./domain";
+import type { Clock, CommandInterpreter, Repository } from "./ports";
 import { createRemindersForBill } from "./reminders";
+import type { ReminderDeps } from "./reminders";
 
 type Deps = { repository: Repository; interpreter: CommandInterpreter; clock: Clock };
-type ConfirmDeps = Deps & { calendar: CalendarGateway; appUrl: string };
+type ConfirmDeps = Deps & ReminderDeps;
 
 /** 30 s de áudio compactado ficam bem abaixo disto; o teto barra envios abusivos antes de gastar IA. */
 export const MAX_AUDIO_BYTES = 1_000_000;
@@ -20,24 +18,13 @@ export type PreviewResult =
 
 export type ConfirmResult = { ok: true; billId: string } | { ok: false; error: "invalid_preview" };
 
-export type MonthView = {
-  month: string;
-  /** Vencimentos cuja Data efetiva cai no mês, por dia. */
-  days: Record<string, Occurrence[]>;
-  /** Todos os Atrasados, de qualquer mês, por Data efetiva: o bloco "Atrasadas" não depende do mês aberto. */
-  overdue: Occurrence[];
-  /** Vencimentos cujo Mês de referência é o mês (a "Energia de maio" paga em 2/jun é de maio). */
-  referenceOccurrences: Occurrence[];
-  summary: MonthSummary;
-};
-
-export async function interpretCommand(deps: Deps, _userId: string, text: string): Promise<PreviewResult> {
+export async function interpretCommand(deps: Deps, text: string): Promise<PreviewResult> {
   const draft = parseDraft(await deps.interpreter.interpret(text, deps.clock.today()));
   return draft ? buildPreview(draft, text, deps.clock.today()) : { ok: false, error: "not_understood" };
 }
 
 /** Comando falado: o áudio vai à IA, que transcreve e interpreta de uma vez. A Prévia mostra a transcrição. */
-export async function interpretVoiceCommand(deps: Deps, _userId: string, audio: AudioInput): Promise<PreviewResult> {
+export async function interpretVoiceCommand(deps: Deps, audio: AudioInput): Promise<PreviewResult> {
   if (audio.data.byteLength === 0 || audio.data.byteLength > MAX_AUDIO_BYTES || !audio.mimeType.startsWith("audio/")) {
     return { ok: false, error: "invalid_audio" };
   }
@@ -49,12 +36,7 @@ export async function interpretVoiceCommand(deps: Deps, _userId: string, audio: 
   return buildPreview(draft, transcript.slice(0, 500), today, "voice");
 }
 
-export async function correctPreview(
-  deps: Deps,
-  _userId: string,
-  preview: Preview,
-  correction: string,
-): Promise<PreviewResult> {
+export async function correctPreview(deps: Deps, preview: Preview, correction: string): Promise<PreviewResult> {
   const previous = parsePreview(preview);
   if (!previous) return { ok: false, error: "invalid_preview" };
 
@@ -90,34 +72,6 @@ export async function confirmPreview(deps: ConfirmDeps, userId: string, preview:
   return { ok: true, billId };
 }
 
-/** O que a tela principal mostra de um mês: os dias, o bloco global de Atrasadas e o Resumo. */
-export async function getMonth(
-  deps: Pick<Deps, "repository" | "clock">,
-  userId: string,
-  month: string,
-): Promise<MonthView> {
-  const today = deps.clock.today();
-  const bills = await deps.repository.listBills(userId);
-  const states = await deps.repository.listOccurrenceStates(userId);
-  const byDate = (a: Occurrence, b: Occurrence) =>
-    a.effectiveDate.localeCompare(b.effectiveDate) || a.title.localeCompare(b.title, "pt-BR");
-
-  // Um Vencimento de maio pode ter Data efetiva em junho: olha o mês anterior também.
-  const around = bills.flatMap((bill) => occurrencesBetween(bill, shiftMonth(month, -1), month, today, states));
-  const inMonth = around.filter((o) => o.effectiveDate.startsWith(month)).sort(byDate);
-  const referenceOccurrences = around.filter((o) => o.referenceMonth === month).sort(byDate);
-
-  const days: Record<string, Occurrence[]> = {};
-  for (const occurrence of inMonth) (days[occurrence.effectiveDate] ??= []).push(occurrence);
-
-  const overdue = bills
-    .flatMap((bill) => occurrencesBetween(bill, bill.startDate.slice(0, 7), today.slice(0, 7), today, states))
-    .filter((o) => o.isOverdue)
-    .sort(byDate);
-
-  return { month, days, overdue, referenceOccurrences, summary: summarize(referenceOccurrences) };
-}
-
 function buildPreview(draft: Draft, originalText: string, today: string, source?: "voice"): PreviewResult {
   const dates = resolveDates(draft, today);
   if (!dates) return { ok: false, error: "not_understood" };
@@ -127,36 +81,36 @@ function buildPreview(draft: Draft, originalText: string, today: string, source?
 /** Primeira e última Data de vencimento; null quando o intervalo não faz sentido. */
 function resolveDates(draft: Draft, today: string): { startDate: string; endDate?: string } | null {
   const { recurrence, day } = draft;
-  const todayMonth = today.slice(0, 7);
-  const todayYear = Number(today.slice(0, 4));
+  // Mensal: um Vencimento por mês. Anual e avulsa: no mês da Conta, um por ano.
+  const period = recurrence === "monthly" ? 1 : 12;
+  const inBillMonth = (year: number) => `${year}-${pad(draft.month!)}`;
 
-  let startDate: string;
-  let endDate: string | undefined;
-
-  if (recurrence === "once") {
-    const mm = pad(draft.month!);
-    const thisYear = dueDateIn(`${todayYear}-${mm}`, day);
-    startDate = draft.year
-      ? dueDateIn(`${draft.year}-${mm}`, day)
-      : thisYear >= today ? thisYear : dueDateIn(`${todayYear + 1}-${mm}`, day);
-    endDate = startDate;
-  } else if (recurrence === "yearly") {
-    const mm = pad(draft.month!);
-    const startYear = draft.startMonth
-      ? Number(draft.startMonth.slice(0, 4))
-      : dueDateIn(`${todayYear}-${mm}`, day) >= today ? todayYear : todayYear + 1;
-    startDate = dueDateIn(`${startYear}-${mm}`, day);
-    if (draft.endMonth) {
-      const endYear = Number(draft.endMonth.slice(0, 4));
-      endDate = dueDateIn(`${Number(draft.endMonth.slice(5)) >= draft.month! ? endYear : endYear - 1}-${mm}`, day);
-    } else if (draft.installments) {
-      endDate = dueDateIn(`${startYear + draft.installments - 1}-${mm}`, day);
-    }
+  let firstMonth: string;
+  if (recurrence === "once" && draft.year) firstMonth = inBillMonth(draft.year);
+  else if (recurrence !== "once" && draft.startMonth) {
+    firstMonth = recurrence === "monthly" ? draft.startMonth : inBillMonth(yearOf(draft.startMonth));
   } else {
-    const firstMonth = draft.startMonth ?? (dueDateIn(todayMonth, day) >= today ? todayMonth : shiftMonth(todayMonth, 1));
-    startDate = dueDateIn(firstMonth, day);
-    if (draft.endMonth) endDate = dueDateIn(draft.endMonth, day);
-    else if (draft.installments) endDate = dueDateIn(shiftMonth(firstMonth, draft.installments - 1), day);
+    // Próximo Vencimento a partir de hoje: o primeiro que ainda dá para pagar (Data efetiva hoje ou depois).
+    // O do período anterior entra na disputa: dia 31 num sábado tem Data efetiva no dia 2 do mês seguinte.
+    const anchor = recurrence === "monthly" ? monthOf(today) : inBillMonth(yearOf(today));
+    firstMonth = [-1, 0, 1]
+      .map((k) => shiftMonth(anchor, k * period))
+      .find((month) => effectiveDate(dueDateIn(month, day)) >= today)!;
+  }
+  const startDate = dueDateIn(firstMonth, day);
+
+  let endDate: string | undefined;
+  if (recurrence === "once") endDate = startDate;
+  else if (draft.endMonth) {
+    // O último Vencimento que cabe até o mês final, inclusivo.
+    const endYear = yearOf(draft.endMonth);
+    const lastMonth =
+      recurrence === "monthly"
+        ? draft.endMonth
+        : inBillMonth(monthNumberOf(draft.endMonth) >= draft.month! ? endYear : endYear - 1);
+    endDate = dueDateIn(lastMonth, day);
+  } else if (draft.installments) {
+    endDate = dueDateIn(shiftMonth(firstMonth, (draft.installments - 1) * period), day);
   }
 
   if (endDate && endDate < startDate) return null;
@@ -193,7 +147,7 @@ function parseDraft(value: unknown): Draft | null {
   const uniqueTags = [...new Set(tags as Tag[])];
   if (uniqueTags.length < 1 || uniqueTags.length > 3) return null;
 
-  if (amount != null && !(typeof amount === "number" && Number.isFinite(amount) && amount >= 0 && amount < 1e10)) return null;
+  if (amount != null && !isValidAmount(amount)) return null;
   if (month != null && !isInt(month, 1, 12)) return null;
   if (recurrence !== "monthly" && month == null) return null;
   if (year != null && !isInt(year, 1900, 2200)) return null;

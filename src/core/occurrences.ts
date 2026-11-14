@@ -1,6 +1,7 @@
 import { dueDateIn, effectiveDate } from "./business-calendar";
+import { isSameOccurrence } from "./domain";
 import type { BillRule, Occurrence, OccurrenceState } from "./domain";
-import { shiftMonth } from "@/lib/month";
+import { monthNumberOf, monthOf, shiftMonth } from "@/lib/month";
 
 /**
  * Vencimentos derivados da regra da Conta cujo Mês de referência está em
@@ -22,15 +23,16 @@ export function occurrencesBetween(
     if (rule.endDate && dueDate > rule.endDate) continue;
 
     const effective = effectiveDate(dueDate);
-    const state = states.find((s) => s.billId === rule.id && s.referenceMonth === month);
-    const isPaid = state ? state.isPaid : dueDate < rule.registeredOn;
+    const ref = { billId: rule.id, referenceMonth: month };
+    const state = states.find((s) => isSameOccurrence(s, ref));
+    // Antes do cadastro, só nasce Pago o que já não dava mais para pagar (Data efetiva passada).
+    const isPaid = state ? state.isPaid : effective < rule.registeredOn;
     const amount = state?.amount ?? rule.amount;
     result.push({
-      billId: rule.id,
+      ...ref,
       title: rule.title,
       tags: rule.tags,
       recurrence: rule.recurrence,
-      referenceMonth: month,
       dueDate,
       effectiveDate: effective,
       amount,
@@ -46,8 +48,8 @@ function hasDueDateIn(rule: BillRule, month: string): boolean {
     case "monthly":
       return true;
     case "yearly":
-      return Number(month.slice(5)) === rule.month;
+      return monthNumberOf(month) === rule.month;
     case "once":
-      return month === rule.startDate.slice(0, 7);
+      return month === monthOf(rule.startDate);
   }
 }

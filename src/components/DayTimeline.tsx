@@ -1,5 +1,6 @@
+import { occurrenceKey, occurrenceStatus } from "@/core/domain";
 import type { Occurrence } from "@/core/domain";
-import { monthLabel } from "@/lib/month";
+import { monthLabel, monthOf } from "@/lib/month";
 import { OccurrenceRow } from "./OccurrenceRow";
 import { Timeline, TimelineItem } from "./Timeline";
 
@@ -8,7 +9,7 @@ const WEEKDAYS = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Q
 /** Vencimentos do dia selecionado, em linha do tempo. Todo Pago fica em cartão forest. */
 export function DayTimeline({ date, today, occurrences }: { date: string; today: string; occurrences: Occurrence[] }) {
   const day = Number(date.slice(8));
-  const { name } = monthLabel(date.slice(0, 7));
+  const { name } = monthLabel(monthOf(date));
   const weekday = WEEKDAYS[new Date(`${date}T12:00:00Z`).getUTCDay()];
 
   return (
@@ -24,7 +25,7 @@ export function DayTimeline({ date, today, occurrences }: { date: string; today:
       ) : (
         <Timeline>
           {occurrences.map((o, i) => (
-            <TimelineItem key={o.billId + o.referenceMonth} index={i} dot={o.isPaid ? "paid" : o.isOverdue ? "late" : "open"}>
+            <TimelineItem key={occurrenceKey(o)} index={i} dot={occurrenceStatus(o)}>
               <OccurrenceRow occurrence={o} />
             </TimelineItem>
           ))}

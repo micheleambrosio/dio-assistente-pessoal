@@ -23,7 +23,7 @@ Next.js, TypeScript, Supabase, Tailwind, Ant Design, Google Gemini (extração e
 - Periodicidades: **mensal**, **anual** e **avulsa**. A IA distingue "todo dia 20" (mensal), "todo 15 de agosto" (anual) e "20 de março" (avulsa).
 - Uma Conta mensal ou anual sem data final é uma **Conta fixa**.
 - O Gemini escolhe de 1 a 3 Etiquetas numa **lista fixa**: Moradia, Utilidades, Transporte, Saúde, Educação, Assinaturas, Cartão, Impostos, Seguros, Lazer e Outros. O Usuário pode corrigi-las por Comando de edição.
-- Data de início: por padrão é o próximo Vencimento a partir de hoje, mas pode ser informada no texto ("desde janeiro", "comecei a pagar em agosto"). Vencimentos anteriores ao cadastro já nascem **pagos** e sem Lembrete.
+- Data de início: por padrão é o próximo Vencimento a partir de hoje, ou seja, o primeiro cuja **Data efetiva** é hoje ou depois. Uma Conta que vence no domingo e é cadastrada na segunda (a Data efetiva) começa nesse Vencimento. A Data de início também pode ser informada no texto ("desde janeiro", "comecei a pagar em agosto"). Vencimentos com Data efetiva anterior ao cadastro já nascem **pagos** e sem Lembrete.
 
 ## Comandos
 
@@ -46,8 +46,8 @@ Next.js, TypeScript, Supabase, Tailwind, Ant Design, Google Gemini (extração e
 
 ## Pagamento
 
-- **Valor da Conta** é o padrão (opcional). **Valor do Vencimento** substitui o padrão naquele mês e pode ser informado pela entrada em linguagem natural ("a energia de novembro deu 187,40", com Prévia) ou num campo opcional "valor pago" no check. Mudar o valor atualiza o título do Lembrete.
-- O check marca o Vencimento como **Pago**.
+- **Valor da Conta** é o padrão (opcional). **Valor do Vencimento** substitui o padrão naquele mês e pode ser informado pela entrada em linguagem natural ("a energia de novembro deu 187,40", com Prévia) ou pelo lápis ao lado do valor do Vencimento (edição na linha: Enter salva, Esc cancela). Mudar o valor atualiza o título do Lembrete.
+- O check só alterna o Vencimento entre **Pago** e não Pago. O valor não muda pelo check.
 - **Atrasado** (calculado): não Pago e com a Data efetiva no passado. Aparece num bloco **global** "Atrasadas" (independente do mês aberto) até receber o check, e tem destaque próprio no Calendário.
 - Ao marcar como Pago, o Lembrete ganha "✅" no título e perde a notificação. Ao desmarcar, o título volta ao original e a notificação é recriada (se a Data efetiva ainda não passou).
 - Fora do MVP: multa e juros, e "pago com atraso" como estado separado.

@@ -1,3 +1,4 @@
+import { monthOf } from "@/lib/month";
 import type { Clock } from "./ports";
 
 const TIME_ZONE = "America/Sao_Paulo";
@@ -21,6 +22,6 @@ export class SaoPauloClock implements Clock {
   }
 
   currentMonth() {
-    return this.today().slice(0, 7);
+    return monthOf(this.today());
   }
 }

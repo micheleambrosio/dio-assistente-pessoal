@@ -54,7 +54,7 @@ export class InMemoryRepository implements Repository {
   async updateReminder(
     userId: string,
     id: string,
-    patch: Partial<Pick<Reminder, "syncStatus" | "googleEventId" | "lastError" | "paid" | "amount">>,
+    patch: Partial<Pick<Reminder, "syncStatus" | "googleEventId" | "lastError" | "isPaid" | "amount">>,
   ) {
     const reminder = (this.reminders.get(userId) ?? []).find((r) => r.id === id);
     if (!reminder) return;

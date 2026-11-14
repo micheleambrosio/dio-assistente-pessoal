@@ -108,7 +108,7 @@ test.describe("Estados do Vencimento", () => {
   test("Atrasado, Pago e a pagar convivem no mesmo mês, cada um com o seu estilo", async ({ page }) => {
     await page.goto("/?m=2025-06&d=2025-06-10");
     const list = dayList(page, 10);
-    await expect(row(list, "Água")).toHaveClass(/bg-late/);
+    await expect(row(list, "Água")).toHaveClass(/bg-overdue/);
     await expect(row(list, "Água").getByText("Atrasada")).toBeVisible();
     await expect(row(list, "Cartão Nubank")).toHaveClass(/bg-dark/);
     await expect(row(list, "Cartão Nubank").getByText("Atrasada")).toHaveCount(0);
@@ -116,7 +116,7 @@ test.describe("Estados do Vencimento", () => {
     await page.goto("/?m=2025-06&d=2025-06-20");
     const open = row(dayList(page, 20), "Plano de saúde");
     await expect(open).toHaveClass(/bg-surface\b/);
-    await expect(open).not.toHaveClass(/bg-late|bg-dark/);
+    await expect(open).not.toHaveClass(/bg-overdue|bg-dark/);
   });
 
   test("marcar como Pago troca o estilo e atualiza o Resumo", async ({ page }) => {

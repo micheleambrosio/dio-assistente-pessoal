@@ -31,18 +31,26 @@ export type BillRule = {
   /** Última Data de vencimento (nominal), inclusiva. Sem ela, é uma Conta fixa. */
   endDate?: string;
   tags: Tag[];
-  /** Dia do cadastro: Vencimentos anteriores a ele nascem Pagos. */
+  /** Dia do cadastro: Vencimentos com Data efetiva anterior a ele nascem Pagos. */
   registeredOn: string;
 };
 
-/** Vencimento. */
-export type Occurrence = {
+/** Identifica um Vencimento: a Conta e o Mês de referência (`YYYY-MM`, dado pela Data de vencimento). */
+export type OccurrenceRef = {
   billId: string;
+  referenceMonth: string;
+};
+
+export const occurrenceKey = (o: OccurrenceRef) => `${o.billId}:${o.referenceMonth}`;
+
+export const isSameOccurrence = (a: OccurrenceRef, b: OccurrenceRef) =>
+  a.billId === b.billId && a.referenceMonth === b.referenceMonth;
+
+/** Vencimento. */
+export type Occurrence = OccurrenceRef & {
   title: string;
   tags: Tag[];
   recurrence: Recurrence;
-  /** `YYYY-MM`, dado pela Data de vencimento. */
-  referenceMonth: string;
   /** Nominal, já ajustada ao último dia do mês. */
   dueDate: string;
   /** Próximo Dia útil; pode cruzar o mês. */
@@ -53,11 +61,22 @@ export type Occurrence = {
   isOverdue: boolean;
 };
 
+export type OccurrenceStatus = "paid" | "overdue" | "open";
+
+export function occurrenceStatus(o: Pick<Occurrence, "isPaid" | "isOverdue">): OccurrenceStatus {
+  return o.isPaid ? "paid" : o.isOverdue ? "overdue" : "open";
+}
+
+/** numeric(12, 2) no banco: até 10 dígitos inteiros. */
+const MAX_AMOUNT = 1e10;
+
+/** Valor aceito para uma Conta ou um Vencimento: número finito, sem negativo, que cabe no banco. */
+export function isValidAmount(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value < MAX_AMOUNT;
+}
+
 /** O que o Usuário decidiu sobre um Vencimento: Pago ou não, e o valor realmente pago. Sobrepõe o que a regra da Conta diz. */
-export type OccurrenceState = {
-  billId: string;
-  /** `YYYY-MM` do Vencimento. */
-  referenceMonth: string;
+export type OccurrenceState = OccurrenceRef & {
   isPaid: boolean;
   /** Valor pago; passa a ser o Valor do Vencimento. */
   amount?: number;
@@ -107,18 +126,15 @@ export type Preview = Draft & {
 export type ReminderSyncStatus = "synced" | "pending_create" | "pending_update" | "pending_delete";
 
 /** Lembrete: o evento do Google Calendar que representa um Vencimento. O conteúdo é guardado para as novas tentativas. */
-export type Reminder = {
+export type Reminder = OccurrenceRef & {
   id: string;
-  billId: string;
-  /** `YYYY-MM` do Vencimento que o Lembrete representa. */
-  referenceMonth: string;
   /** Dia do evento: a Data efetiva do Vencimento. */
   effectiveDate: string;
   title: string;
   amount?: number;
   tags: Tag[];
   /** O Vencimento está Pago: o título ganha "✅ " e a notificação some. */
-  paid: boolean;
+  isPaid: boolean;
   syncStatus: ReminderSyncStatus;
   /** Id do evento no Google; ausente até a criação dar certo. */
   googleEventId?: string;

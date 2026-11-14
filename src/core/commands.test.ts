@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { confirmPreview, correctPreview, getMonth, interpretCommand } from "./commands";
+import { confirmPreview, correctPreview, interpretCommand } from "./commands";
+import { getMonth } from "./month-view";
 import type { Draft, Preview } from "./domain";
 import { FakeCalendarGateway } from "./fakes/fake-calendar-gateway";
 import { FakeCommandInterpreter } from "./fakes/fake-command-interpreter";
@@ -19,7 +20,7 @@ const monthly: Draft = { title: "Internet Vivo", amount: 120, recurrence: "month
 
 async function previewOf(draft: Draft, today = "2025-01-10", text = "comando") {
   const { deps } = setup(today, draft);
-  const result = await interpretCommand(deps, USER, text);
+  const result = await interpretCommand(deps, text);
   if (!result.ok) throw new Error("esperava uma Prévia");
   return result.preview;
 }
@@ -27,7 +28,7 @@ async function previewOf(draft: Draft, today = "2025-01-10", text = "comando") {
 describe("interpretCommand", () => {
   it("devolve uma Prévia com o texto, os campos e as Etiquetas, sem persistir nada", async () => {
     const { deps, repository } = setup("2025-01-10", monthly);
-    const result = await interpretCommand(deps, USER, "internet Vivo, 120, todo dia 15");
+    const result = await interpretCommand(deps, "internet Vivo, 120, todo dia 15");
     expect(result).toEqual({
       ok: true,
       preview: { ...monthly, action: "create_bill", originalText: "internet Vivo, 120, todo dia 15", startDate: "2025-01-15" },
@@ -37,13 +38,13 @@ describe("interpretCommand", () => {
 
   it("repassa a data de hoje (America/Sao_Paulo) à IA", async () => {
     const { deps, interpreter } = setup("2025-01-10", monthly);
-    await interpretCommand(deps, USER, "x");
+    await interpretCommand(deps, "x");
     expect(interpreter.interpretCalls).toEqual([{ text: "x", today: "2025-01-10" }]);
   });
 
   it("devolve not_understood quando a IA não entende o Comando", async () => {
     const { deps } = setup("2025-01-10", null);
-    expect(await interpretCommand(deps, USER, "bom dia")).toEqual({ ok: false, error: "not_understood" });
+    expect(await interpretCommand(deps, "bom dia")).toEqual({ ok: false, error: "not_understood" });
   });
 
   it.each([
@@ -60,7 +61,7 @@ describe("interpretCommand", () => {
     ["mês fora da faixa", { ...monthly, recurrence: "yearly", month: 13 }],
   ] as [string, unknown][])("devolve not_understood para uma resposta inválida da IA (%s)", async (_name, draft) => {
     const { deps } = setup("2025-01-10", draft as Draft);
-    expect(await interpretCommand(deps, USER, "x")).toEqual({ ok: false, error: "not_understood" });
+    expect(await interpretCommand(deps, "x")).toEqual({ ok: false, error: "not_understood" });
   });
 
   it("por padrão, a Data de início é o próximo Vencimento a partir de hoje", async () => {
@@ -109,17 +110,17 @@ describe("interpretCommand", () => {
 
   it("devolve not_understood quando a data final fica antes da Data de início", async () => {
     const { deps } = setup("2025-01-10", { ...monthly, startMonth: "2025-06", endMonth: "2025-03" });
-    expect(await interpretCommand(deps, USER, "x")).toEqual({ ok: false, error: "not_understood" });
+    expect(await interpretCommand(deps, "x")).toEqual({ ok: false, error: "not_understood" });
   });
 });
 
 describe("correctPreview", () => {
   it("devolve a Prévia atualizada pela correção, sem persistir nada", async () => {
     const { deps, repository, interpreter } = setup("2025-01-10", monthly, { ...monthly, day: 16 });
-    const first = await interpretCommand(deps, USER, "internet Vivo, 120, todo dia 15");
+    const first = await interpretCommand(deps, "internet Vivo, 120, todo dia 15");
     if (!first.ok) throw new Error("esperava uma Prévia");
 
-    const result = await correctPreview(deps, USER, first.preview, "não, é dia 16");
+    const result = await correctPreview(deps, first.preview, "não, é dia 16");
 
     expect(result).toEqual({ ok: true, preview: { ...first.preview, day: 16, startDate: "2025-01-16" } });
     expect(interpreter.correctCalls).toEqual([{ previous: monthly, correction: "não, é dia 16", today: "2025-01-10" }]);
@@ -128,22 +129,22 @@ describe("correctPreview", () => {
 
   it("mantém o texto original do Comando", async () => {
     const { deps } = setup("2025-01-10", monthly, { ...monthly, day: 16 });
-    const first = await interpretCommand(deps, USER, "texto original");
+    const first = await interpretCommand(deps, "texto original");
     if (!first.ok) throw new Error("esperava uma Prévia");
-    const result = await correctPreview(deps, USER, first.preview, "dia 16");
+    const result = await correctPreview(deps, first.preview, "dia 16");
     expect(result.ok && result.preview.originalText).toBe("texto original");
   });
 
   it("devolve not_understood quando a correção não é entendida", async () => {
     const { deps } = setup("2025-01-10", monthly, null);
-    const first = await interpretCommand(deps, USER, "x");
+    const first = await interpretCommand(deps, "x");
     if (!first.ok) throw new Error("esperava uma Prévia");
-    expect(await correctPreview(deps, USER, first.preview, "blá")).toEqual({ ok: false, error: "not_understood" });
+    expect(await correctPreview(deps, first.preview, "blá")).toEqual({ ok: false, error: "not_understood" });
   });
 
   it("rejeita uma Prévia inválida vinda do cliente", async () => {
     const { deps, interpreter } = setup();
-    const result = await correctPreview(deps, USER, { ...monthly, day: 99 } as unknown as Preview, "dia 16");
+    const result = await correctPreview(deps, { ...monthly, day: 99 } as unknown as Preview, "dia 16");
     expect(result).toEqual({ ok: false, error: "invalid_preview" });
     expect(interpreter.correctCalls).toEqual([]);
   });
@@ -178,6 +179,26 @@ describe("confirmPreview", () => {
     const result = await confirmPreview(deps, USER, { ...preview, tags: ["inexistente"] } as unknown as Preview);
     expect(result).toEqual({ ok: false, error: "invalid_preview" });
     expect(await repository.listBills(USER)).toEqual([]);
+  });
+
+  it("a Data de início é o próximo Vencimento que ainda dá para pagar: vale a Data efetiva, não a nominal", async () => {
+    // 15/06/2025 é domingo: a Data efetiva é segunda, 16/06, o dia do cadastro.
+    const { deps, repository } = setup("2025-06-16", monthly);
+    await confirmPreview(deps, USER, await previewOf(monthly, "2025-06-16"));
+
+    const [bill] = await repository.listBills(USER);
+    expect(bill.startDate).toBe("2025-06-15");
+    const [june] = (await getMonth(deps, USER, "2025-06")).days["2025-06-16"];
+    expect(june).toMatchObject({ referenceMonth: "2025-06", isPaid: false, isOverdue: false });
+  });
+
+  it("o Vencimento do mês anterior conta quando a Data efetiva dele ainda não passou", async () => {
+    // 31/05/2025 é sábado: a Data efetiva é segunda, 02/06. Hoje é domingo, 01/06.
+    const draft: Draft = { ...monthly, day: 31 };
+    const { deps, repository } = setup("2025-06-01", draft);
+    await confirmPreview(deps, USER, await previewOf(draft, "2025-06-01"));
+
+    expect((await repository.listBills(USER))[0].startDate).toBe("2025-05-31");
   });
 
   it("recalcula as datas a partir dos campos, ignorando datas adulteradas", async () => {

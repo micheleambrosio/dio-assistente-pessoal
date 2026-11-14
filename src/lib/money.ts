@@ -3,10 +3,16 @@ const MAX_DIGITS = 11; // numeric(12, 2) comporta até 10 dígitos inteiros; 11 
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
+/** `1234.5` → `R$ 1.234,50`, com espaço não separável entre o símbolo e o número (para a tela). */
+export const formatMoney = (value: number) => brl.format(value);
+
+/** Igual a `formatMoney`, mas com espaço comum: para campos de texto e para o evento do Calendar. */
+export const formatMoneyText = (value: number) => formatMoney(value).replace(/\u00a0/g, " ");
+
 export function maskMoney(text: string): string {
   const digits = text.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, MAX_DIGITS);
   if (!digits) return "";
-  return brl.format(Number(digits) / 100).replace(/ /g, " ");
+  return formatMoneyText(Number(digits) / 100);
 }
 
 /** "R$ 1.234,56" → 1234.56; vazio → undefined. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getMonth } from "../commands";
+import { getMonth } from "../month-view";
 import { FixedClock } from "./fixed-clock";
 import { InMemoryRepository } from "./in-memory-repository";
 import { PROTOTYPE_NOW, PROTOTYPE_USER_ID, seedPrototype } from "./prototype-seed";
