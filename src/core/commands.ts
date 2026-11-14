@@ -3,9 +3,11 @@ import { dueDateIn } from "./business-calendar";
 import { RECURRENCES, TAGS } from "./domain";
 import type { BillRule, Draft, Occurrence, Preview, Tag } from "./domain";
 import { occurrencesBetween } from "./occurrences";
-import type { Clock, CommandInterpreter, Repository } from "./ports";
+import type { CalendarGateway, Clock, CommandInterpreter, Repository } from "./ports";
+import { createRemindersForBill } from "./reminders";
 
 type Deps = { repository: Repository; interpreter: CommandInterpreter; clock: Clock };
+type ConfirmDeps = Deps & { calendar: CalendarGateway; appUrl: string };
 
 export type PreviewResult =
   | { ok: true; preview: Preview }
@@ -35,7 +37,7 @@ export async function correctPreview(
 }
 
 /** Valida a Prévia de novo no servidor e só então salva. Datas vêm dos campos, não do cliente. */
-export async function confirmPreview(deps: Deps, userId: string, preview: Preview): Promise<ConfirmResult> {
+export async function confirmPreview(deps: ConfirmDeps, userId: string, preview: Preview): Promise<ConfirmResult> {
   const parsed = parsePreview(preview);
   if (!parsed) return { ok: false, error: "invalid_preview" };
 
@@ -55,7 +57,10 @@ export async function confirmPreview(deps: Deps, userId: string, preview: Previe
     ...(draft.month !== undefined && { month: draft.month }),
     ...(dates.endDate && { endDate: dates.endDate }),
   };
-  return { ok: true, billId: await deps.repository.saveBill(userId, rule) };
+  const billId = await deps.repository.saveBill(userId, rule);
+  // Depois de salva, a Conta vale mesmo que o Google falhe: os Lembretes ficam pendentes (ADR 0005).
+  await createRemindersForBill(deps, userId, { ...rule, id: billId });
+  return { ok: true, billId };
 }
 
 /** Vencimentos cuja Data efetiva cai no mês, por dia. Um Vencimento de maio pode aparecer em junho. */

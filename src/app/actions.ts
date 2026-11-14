@@ -1,9 +1,14 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { SaoPauloClock } from "@/core/clock";
 import { confirmPreview, correctPreview, interpretCommand } from "@/core/commands";
 import type { ConfirmResult, PreviewResult } from "@/core/commands";
 import type { Preview } from "@/core/domain";
+import { syncOnAppOpen } from "@/core/reminders";
+import type { SyncStatus } from "@/core/reminders";
+import { appUrl } from "@/infra/app-url";
+import { GoogleCalendarGateway } from "@/infra/google-calendar-gateway";
 import { GeminiCommandInterpreter } from "@/infra/gemini-command-interpreter";
 import { createUserClient } from "@/infra/supabase";
 import { SupabaseRepository } from "@/infra/supabase-repository";
@@ -18,6 +23,8 @@ async function context() {
       repository: new SupabaseRepository(supabase),
       interpreter: new GeminiCommandInterpreter(),
       clock: new SaoPauloClock(),
+      calendar: new GoogleCalendarGateway(),
+      appUrl: appUrl(),
     },
   };
 }
@@ -51,5 +58,18 @@ export async function confirmPreviewAction(preview: Preview): Promise<ConfirmRes
   } catch (e) {
     console.error("Falha ao salvar a Conta", e);
     return { ok: false, error: "unavailable" };
+  }
+}
+
+/** "Tentar agora": retoma os Lembretes pendentes na hora. */
+export async function retryRemindersAction(): Promise<SyncStatus | { error: "unavailable" }> {
+  const { userId, deps } = await context();
+  try {
+    const status = await syncOnAppOpen(deps, userId);
+    revalidatePath("/");
+    return status;
+  } catch (e) {
+    console.error("Falha ao sincronizar os Lembretes", e);
+    return { error: "unavailable" };
   }
 }

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { NavLink } from "./NavigationProvider";
 import type { Occurrence } from "@/core/domain";
 import { monthWeeks } from "@/lib/month";
 
@@ -40,7 +40,7 @@ export function MonthCalendar({ month, today, selected, days }: Props) {
           const hasOverdue = occurrences.some((o) => o.isOverdue);
           const label = occurrences.length ? `, ${occurrences.length} ${occurrences.length === 1 ? "Conta" : "Contas"}` : "";
           return (
-            <Link
+            <NavLink
               key={i}
               href={`/?m=${month}&d=${date}`}
               scroll={false}
@@ -77,7 +77,7 @@ export function MonthCalendar({ month, today, selected, days }: Props) {
                   <i key={o.billId + o.dueDate} className={`size-1.5 rounded-full ${dotStyle(o)}`} />
                 ))}
               </span>
-            </Link>
+            </NavLink>
           );
         })}
       </div>

@@ -26,6 +26,8 @@ Todo identificador de código (variáveis, funções, classes, tipos, enums, arq
 | Lembrete | `Reminder` |
 | Janela de lembretes | `ReminderWindow` |
 | Lembrete pendente | `Reminder` com `syncStatus` `pending_create` / `pending_update` / `pending_delete` |
+| Lembrete sincronizado | `Reminder` com `syncStatus` `synced` |
+| Acesso revogado (Google recusou a autenticação) | `access_revoked` / `GoogleAuthError` |
 | Agenda de contas (Google) | `BillsCalendar` |
 | Calendário (visão do app) | `MonthCalendar` |
 | Resumo do mês | `MonthSummary` |

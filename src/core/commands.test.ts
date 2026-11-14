@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { confirmPreview, correctPreview, getMonth, interpretCommand } from "./commands";
 import type { Draft, Preview } from "./domain";
+import { FakeCalendarGateway } from "./fakes/fake-calendar-gateway";
 import { FakeCommandInterpreter } from "./fakes/fake-command-interpreter";
 import { FixedClock } from "./fakes/fixed-clock";
 import { InMemoryRepository } from "./fakes/in-memory-repository";
@@ -11,7 +12,7 @@ function setup(today = "2025-01-10", interpretResult: Draft | null = null, corre
   const repository = new InMemoryRepository();
   const interpreter = new FakeCommandInterpreter(interpretResult, correctResult);
   const clock = new FixedClock(new Date(`${today}T12:00:00-03:00`));
-  return { deps: { repository, interpreter, clock }, repository, interpreter };
+  return { deps: { repository, interpreter, clock, calendar: new FakeCalendarGateway(), appUrl: "https://contas.example.com" }, repository, interpreter };
 }
 
 const monthly: Draft = { title: "Internet Vivo", amount: 120, recurrence: "monthly", day: 15, tags: ["utilities"] };
