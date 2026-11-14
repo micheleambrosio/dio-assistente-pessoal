@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { CommandBar } from "@/components/command-bar";
-import { MonthCalendar } from "@/components/month-calendar";
+import { CommandBar } from "@/components/CommandBar";
+import { MonthCalendar } from "@/components/MonthCalendar";
 import { SaoPauloClock } from "@/core/clock";
 import { ensureBillsCalendar } from "@/core/ensure-bills-calendar";
 import { GoogleCalendarGateway } from "@/infra/google-calendar-gateway";
