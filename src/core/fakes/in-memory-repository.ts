@@ -1,10 +1,11 @@
-import type { BillRule, Reminder } from "../domain";
+import type { BillRule, OccurrenceState, Reminder } from "../domain";
 import type { Repository } from "../ports";
 
 export class InMemoryRepository implements Repository {
   private billsCalendarIds = new Map<string, string>();
   private bills = new Map<string, BillRule[]>();
   private reminders = new Map<string, Reminder[]>();
+  private states = new Map<string, OccurrenceState[]>();
   private revoked = new Set<string>();
   private counter = 0;
 
@@ -29,6 +30,17 @@ export class InMemoryRepository implements Repository {
     return this.bills.get(userId) ?? [];
   }
 
+  async listOccurrenceStates(userId: string) {
+    return (this.states.get(userId) ?? []).map((s) => ({ ...s }));
+  }
+
+  async saveOccurrenceState(userId: string, state: OccurrenceState) {
+    const others = (this.states.get(userId) ?? []).filter(
+      (s) => !(s.billId === state.billId && s.referenceMonth === state.referenceMonth),
+    );
+    this.states.set(userId, [...others, { ...state }]);
+  }
+
   async listReminders(userId: string) {
     return (this.reminders.get(userId) ?? []).map((r) => ({ ...r }));
   }
@@ -42,7 +54,7 @@ export class InMemoryRepository implements Repository {
   async updateReminder(
     userId: string,
     id: string,
-    patch: Partial<Pick<Reminder, "syncStatus" | "googleEventId" | "lastError">>,
+    patch: Partial<Pick<Reminder, "syncStatus" | "googleEventId" | "lastError" | "paid" | "amount">>,
   ) {
     const reminder = (this.reminders.get(userId) ?? []).find((r) => r.id === id);
     if (!reminder) return;

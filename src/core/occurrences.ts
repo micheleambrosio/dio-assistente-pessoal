@@ -1,5 +1,5 @@
 import { dueDateIn, effectiveDate } from "./business-calendar";
-import type { BillRule, Occurrence } from "./domain";
+import type { BillRule, Occurrence, OccurrenceState } from "./domain";
 import { shiftMonth } from "@/lib/month";
 
 /**
@@ -11,6 +11,7 @@ export function occurrencesBetween(
   fromMonth: string,
   toMonth: string,
   today: string,
+  states: OccurrenceState[] = [],
 ): Occurrence[] {
   const result: Occurrence[] = [];
   for (let month = fromMonth; month <= toMonth; month = shiftMonth(month, 1)) {
@@ -21,7 +22,9 @@ export function occurrencesBetween(
     if (rule.endDate && dueDate > rule.endDate) continue;
 
     const effective = effectiveDate(dueDate);
-    const isPaid = dueDate < rule.registeredOn;
+    const state = states.find((s) => s.billId === rule.id && s.referenceMonth === month);
+    const isPaid = state ? state.isPaid : dueDate < rule.registeredOn;
+    const amount = state?.amount ?? rule.amount;
     result.push({
       billId: rule.id,
       title: rule.title,
@@ -30,7 +33,7 @@ export function occurrencesBetween(
       referenceMonth: month,
       dueDate,
       effectiveDate: effective,
-      amount: rule.amount,
+      amount,
       isPaid,
       isOverdue: !isPaid && effective < today,
     });

@@ -226,7 +226,7 @@ describe("getMonth", () => {
 
   it("devolve um mês vazio quando nada vence", async () => {
     const { deps } = setup();
-    expect(await getMonth(deps, USER, "2025-01")).toEqual({ month: "2025-01", days: {} });
+    expect(await getMonth(deps, USER, "2025-01")).toMatchObject({ month: "2025-01", days: {}, overdue: [] });
   });
 
   it("não mostra as Contas de outro Usuário", async () => {

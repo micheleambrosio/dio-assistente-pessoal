@@ -29,6 +29,7 @@ export async function createRemindersForBill(deps: ReminderDeps, userId: string,
 
 async function extendWindow(deps: ReminderDeps, userId: string, rule: BillRule, all: Reminder[]) {
   const today = deps.clock.today();
+  const states = await deps.repository.listOccurrenceStates(userId);
   const mine = all.filter((r) => r.billId === rule.id && r.syncStatus !== "pending_delete");
   const lastReference = mine.map((r) => r.referenceMonth).sort().at(-1);
   const lastReminderMonth = mine.map((r) => r.effectiveDate.slice(0, 7)).sort().at(-1);
@@ -38,7 +39,7 @@ async function extendWindow(deps: ReminderDeps, userId: string, rule: BillRule, 
   // O Vencimento do mês anterior pode ter Data efetiva neste mês.
   const from = [firstMonth, shiftMonth(today.slice(0, 7), -1)].sort().at(-1)!;
 
-  const fresh = occurrencesBetween(rule, from, shiftMonth(from, SEARCH_MONTHS), today)
+  const fresh = occurrencesBetween(rule, from, shiftMonth(from, SEARCH_MONTHS), today, states)
     .filter((o) => o.dueDate >= rule.registeredOn && o.effectiveDate >= today)
     .slice(0, WINDOW_SIZE);
 
@@ -50,10 +51,40 @@ async function extendWindow(deps: ReminderDeps, userId: string, rule: BillRule, 
       effectiveDate: o.effectiveDate,
       title: o.title,
       tags: o.tags,
+      paid: o.isPaid,
       syncStatus: "pending_create" as const,
       ...(o.amount !== undefined && { amount: o.amount }),
     })),
   );
+}
+
+/**
+ * Reflete no Lembrete o que mudou no Vencimento (Pago, valor) e tenta mandar ao Google.
+ * Sem Lembrete (fora da Janela), não há o que fazer. Falhas do Google viram pendência (ADR 0005).
+ */
+export async function updateReminderForOccurrence(
+  deps: ReminderDeps,
+  userId: string,
+  billId: string,
+  referenceMonth: string,
+  change: { paid: boolean; amount?: number },
+): Promise<void> {
+  const reminder = (await deps.repository.listReminders(userId)).find(
+    (r) => r.billId === billId && r.referenceMonth === referenceMonth && r.syncStatus !== "pending_delete",
+  );
+  if (!reminder) return;
+  // Gravar a pendência no app tem de dar certo; só o Google pode falhar em silêncio.
+  await deps.repository.updateReminder(userId, reminder.id, {
+    paid: change.paid,
+    ...(change.amount !== undefined && { amount: change.amount }),
+    // Um Lembrete que ainda não existe no Google só precisa nascer com o conteúdo novo.
+    syncStatus: reminder.syncStatus === "pending_create" ? "pending_create" : "pending_update",
+  });
+  try {
+    await pushPending(deps, userId);
+  } catch {
+    // Fica para a próxima abertura do app.
+  }
 }
 
 /** Depois de o Usuário reconectar a conta Google: limpa o aviso e sincroniza as pendências. */
@@ -136,7 +167,7 @@ async function push(deps: ReminderDeps, userId: string, calendarId: string, remi
     return;
   }
 
-  const event = eventFor(reminder, deps.appUrl);
+  const event = eventFor(reminder, deps.appUrl, deps.clock.today());
   if (reminder.syncStatus === "pending_update" && googleEventId) {
     await calendar.updateReminder(userId, calendarId, googleEventId, event);
     await repository.updateReminder(userId, reminder.id, { syncStatus: "synced", lastError: undefined });
@@ -156,16 +187,18 @@ function messageOf(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-function eventFor(reminder: Reminder, appUrl: string): ReminderEvent {
-  const summary =
-    reminder.amount === undefined ? reminder.title : `${reminder.title}: ${formatMoney(reminder.amount)}`;
+function eventFor(reminder: Reminder, appUrl: string, today: string): ReminderEvent {
+  const base = reminder.amount === undefined ? reminder.title : `${reminder.title}: ${formatMoney(reminder.amount)}`;
+  const summary = reminder.paid ? `✅ ${base}` : base;
+  // Pago não avisa; depois da Data efetiva também não há mais o que avisar.
+  const notify = !reminder.paid && reminder.effectiveDate >= today;
   return {
     summary,
     description: `Etiquetas: ${reminder.tags.map((t) => TAG_LABELS[t]).join(", ")}\n${appUrl}`,
     start: `${reminder.effectiveDate}T09:00:00`,
     end: `${reminder.effectiveDate}T09:15:00`,
     timeZone: TIME_ZONE,
-    popupMinutesBefore: 0,
+    popupMinutesBefore: notify ? 0 : null,
   };
 }
 

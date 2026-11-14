@@ -112,7 +112,10 @@ function eventBody(event: ReminderEvent) {
     description: event.description,
     start: { dateTime: event.start, timeZone: event.timeZone },
     end: { dateTime: event.end, timeZone: event.timeZone },
-    reminders: { useDefault: false, overrides: [{ method: "popup", minutes: event.popupMinutesBefore }] },
+    reminders: {
+      useDefault: false,
+      overrides: event.popupMinutesBefore === null ? [] : [{ method: "popup", minutes: event.popupMinutesBefore }],
+    },
   };
 }
 

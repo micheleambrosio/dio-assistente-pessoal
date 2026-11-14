@@ -34,6 +34,8 @@ Todo identificador de código (variáveis, funções, classes, tipos, enums, arq
 | Regra de uma Conta (revisão vigente) | `BillRule` |
 | O que a IA extrai de um Comando de cadastro | `Draft` |
 | Vencimentos de um mês, por dia | `MonthView` |
+| Estado de um Vencimento (Pago, valor pago) | `OccurrenceState` / `occurrence_states` |
+| Marcar/desmarcar como Pago | `togglePaid` |
 | Dia do cadastro da Conta (`registeredOn`) | `registeredOn` |
 | Parcelas / mês inicial / mês final de um Comando | `installments` / `startMonth` / `endMonth` |
 

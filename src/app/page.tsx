@@ -5,6 +5,8 @@ import { CommandBar } from "@/components/CommandBar";
 import { DayTimeline } from "@/components/DayTimeline";
 import { MonthCalendar } from "@/components/MonthCalendar";
 import { NavigationProvider } from "@/components/NavigationProvider";
+import { MonthSummary } from "@/components/MonthSummary";
+import { OverdueTimeline } from "@/components/OverdueTimeline";
 import { MonthNav } from "@/components/MonthNav";
 import { MonthSkeleton } from "@/components/MonthSkeleton";
 import { PendingRemindersNotice } from "@/components/PendingRemindersNotice";
@@ -51,13 +53,17 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
 }
 
 async function MonthBody({ month, day, clock }: { month: string; day?: string; clock: SaoPauloClock }) {
-  const days = await loadMonth(month, clock);
+  const view = await loadMonth(month, clock);
+  const days = view?.days ?? {};
   const today = clock.today();
   const selected = day?.startsWith(month) && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : today.startsWith(month) ? today : `${month}-01`;
   return (
     <>
+      {view && <MonthSummary summary={view.summary} occurrences={view.referenceOccurrences} />}
       <MonthCalendar month={month} today={today} selected={selected} days={days} />
-      <div className="mt-1">
+      {/* Atrasadas é global e fica ao lado do dia (desktop) ou acima dele (mobile). */}
+      <div className={`mt-1 grid items-start gap-6 ${view?.overdue.length ? "lg:grid-cols-2" : ""}`}>
+        <OverdueTimeline occurrences={view?.overdue ?? []} />
         <DayTimeline date={selected} today={today} occurrences={days[selected] ?? []} />
       </div>
     </>
@@ -107,9 +113,9 @@ async function retryMissingBillsCalendar() {
 async function loadMonth(month: string, clock: SaoPauloClock) {
   const supabase = await createUserClient();
   const { data } = await supabase.auth.getUser();
-  if (!data.user) return {};
+  if (!data.user) return null;
   const repository = new SupabaseRepository(supabase);
-  return (await getMonth({ repository, clock }, data.user.id, month)).days;
+  return getMonth({ repository, clock }, data.user.id, month);
 }
 
 /** Estende a Janela de lembretes e retoma os pendentes. null = Usuário sem sessão ou falha inesperada. */
