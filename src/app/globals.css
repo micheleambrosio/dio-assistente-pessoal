@@ -87,3 +87,94 @@ body {
 .hairline {
   box-shadow: 0 0 0 1px var(--border);
 }
+
+/* Dark mode também pelo seletor do Usuário (html[data-theme]), não só pela preferência do sistema. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Check do Pago: traço desenhado e partículas. */
+@keyframes check-draw {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}
+.check-draw {
+  stroke-dasharray: 24;
+  animation: check-draw 0.35s ease-out both;
+}
+@keyframes particle {
+  from { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  to { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.2); opacity: 0; }
+}
+.particle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: var(--lime);
+  pointer-events: none;
+  animation: particle 0.6s ease-out forwards;
+}
+
+/* O círculo "salta" ao marcar; o check some ao desmarcar. */
+@keyframes check-pop {
+  0% { transform: scale(0.8); }
+  55% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+.check-pop {
+  animation: check-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes check-out {
+  from { transform: scale(1) rotate(0); opacity: 1; }
+  to { transform: scale(0.2) rotate(-25deg); opacity: 0; }
+}
+.check-out {
+  animation: check-out 0.3s ease-in both;
+}
+
+/* Entrada dos itens da linha do tempo e do mês (o protótipo usa spring; aqui, uma curva com leve ultrapasse). */
+@keyframes timeline-in {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.timeline-in {
+  animation: timeline-in 0.4s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+@keyframes month-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.month-in {
+  animation: month-in 0.25s ease-out both;
+}
+
+/* Alerta das Atrasadas. */
+@keyframes blink {
+  50% { opacity: 0.25; }
+}
+.blink {
+  animation: blink 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .check-draw,
+  .check-pop,
+  .check-out,
+  .timeline-in,
+  .month-in,
+  .blink {
+    animation: none;
+  }
+  .particle {
+    display: none;
+  }
+}
+
+/* Tudo que é botão e está ativo mostra a mãozinha (o Tailwind 4 deixa o cursor padrão). */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}

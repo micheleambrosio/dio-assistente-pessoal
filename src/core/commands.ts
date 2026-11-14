@@ -2,6 +2,8 @@ import { shiftMonth, isMonth } from "@/lib/month";
 import { dueDateIn } from "./business-calendar";
 import { RECURRENCES, TAGS } from "./domain";
 import type { BillRule, Draft, Occurrence, Preview, Tag } from "./domain";
+import { summarize } from "./month-summary";
+import type { MonthSummary } from "./month-summary";
 import { occurrencesBetween } from "./occurrences";
 import type { CalendarGateway, Clock, CommandInterpreter, Repository } from "./ports";
 import { createRemindersForBill } from "./reminders";
@@ -15,7 +17,16 @@ export type PreviewResult =
 
 export type ConfirmResult = { ok: true; billId: string } | { ok: false; error: "invalid_preview" };
 
-export type MonthView = { month: string; days: Record<string, Occurrence[]> };
+export type MonthView = {
+  month: string;
+  /** Vencimentos cuja Data efetiva cai no mês, por dia. */
+  days: Record<string, Occurrence[]>;
+  /** Todos os Atrasados, de qualquer mês, por Data efetiva: o bloco "Atrasadas" não depende do mês aberto. */
+  overdue: Occurrence[];
+  /** Vencimentos cujo Mês de referência é o mês (a "Energia de maio" paga em 2/jun é de maio). */
+  referenceOccurrences: Occurrence[];
+  summary: MonthSummary;
+};
 
 export async function interpretCommand(deps: Deps, _userId: string, text: string): Promise<PreviewResult> {
   const draft = parseDraft(await deps.interpreter.interpret(text, deps.clock.today()));
@@ -63,7 +74,7 @@ export async function confirmPreview(deps: ConfirmDeps, userId: string, preview:
   return { ok: true, billId };
 }
 
-/** Vencimentos cuja Data efetiva cai no mês, por dia. Um Vencimento de maio pode aparecer em junho. */
+/** O que a tela principal mostra de um mês: os dias, o bloco global de Atrasadas e o Resumo. */
 export async function getMonth(
   deps: Pick<Deps, "repository" | "clock">,
   userId: string,
@@ -71,14 +82,24 @@ export async function getMonth(
 ): Promise<MonthView> {
   const today = deps.clock.today();
   const bills = await deps.repository.listBills(userId);
-  const found = bills
-    .flatMap((bill) => occurrencesBetween(bill, shiftMonth(month, -1), month, today))
-    .filter((o) => o.effectiveDate.startsWith(month))
-    .sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate) || a.title.localeCompare(b.title, "pt-BR"));
+  const states = await deps.repository.listOccurrenceStates(userId);
+  const byDate = (a: Occurrence, b: Occurrence) =>
+    a.effectiveDate.localeCompare(b.effectiveDate) || a.title.localeCompare(b.title, "pt-BR");
+
+  // Um Vencimento de maio pode ter Data efetiva em junho: olha o mês anterior também.
+  const around = bills.flatMap((bill) => occurrencesBetween(bill, shiftMonth(month, -1), month, today, states));
+  const inMonth = around.filter((o) => o.effectiveDate.startsWith(month)).sort(byDate);
+  const referenceOccurrences = around.filter((o) => o.referenceMonth === month).sort(byDate);
 
   const days: Record<string, Occurrence[]> = {};
-  for (const occurrence of found) (days[occurrence.effectiveDate] ??= []).push(occurrence);
-  return { month, days };
+  for (const occurrence of inMonth) (days[occurrence.effectiveDate] ??= []).push(occurrence);
+
+  const overdue = bills
+    .flatMap((bill) => occurrencesBetween(bill, bill.startDate.slice(0, 7), today.slice(0, 7), today, states))
+    .filter((o) => o.isOverdue)
+    .sort(byDate);
+
+  return { month, days, overdue, referenceOccurrences, summary: summarize(referenceOccurrences) };
 }
 
 function buildPreview(draft: Draft, originalText: string, today: string): PreviewResult {

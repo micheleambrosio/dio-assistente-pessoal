@@ -5,6 +5,8 @@ import { CommandBar } from "@/components/CommandBar";
 import { DayTimeline } from "@/components/DayTimeline";
 import { MonthCalendar } from "@/components/MonthCalendar";
 import { NavigationProvider } from "@/components/NavigationProvider";
+import { MonthSummary } from "@/components/MonthSummary";
+import { OverdueTimeline } from "@/components/OverdueTimeline";
 import { MonthNav } from "@/components/MonthNav";
 import { MonthSkeleton } from "@/components/MonthSkeleton";
 import { PendingRemindersNotice } from "@/components/PendingRemindersNotice";
@@ -33,7 +35,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
           <Notices clock={clock} />
         </Suspense>
         <header className="flex flex-wrap items-end justify-between gap-3">
-          <h1 className="display text-[clamp(52px,11vw,120px)] uppercase">
+          <h1 key={month} className="display month-in text-[clamp(52px,11vw,120px)] uppercase">
             {name} <span className="ml-1 text-[0.4em] text-muted">{year}</span>
           </h1>
           <div className="flex items-center gap-2">
@@ -51,16 +53,20 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
 }
 
 async function MonthBody({ month, day, clock }: { month: string; day?: string; clock: SaoPauloClock }) {
-  const days = await loadMonth(month, clock);
+  const view = await loadMonth(month, clock);
+  const days = view?.days ?? {};
   const today = clock.today();
   const selected = day?.startsWith(month) && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : today.startsWith(month) ? today : `${month}-01`;
   return (
-    <>
+    <div className="month-in flex flex-col gap-4">
+      {view && <MonthSummary summary={view.summary} occurrences={view.referenceOccurrences} />}
       <MonthCalendar month={month} today={today} selected={selected} days={days} />
-      <div className="mt-1">
+      {/* Atrasadas é global e fica ao lado do dia (desktop) ou acima dele (mobile). */}
+      <div className={`mt-1 grid grid-cols-[minmax(0,1fr)] items-start gap-6 ${view?.overdue.length ? "lg:grid-cols-2" : ""}`}>
+        <OverdueTimeline occurrences={view?.overdue ?? []} />
         <DayTimeline date={selected} today={today} occurrences={days[selected] ?? []} />
       </div>
-    </>
+    </div>
   );
 }
 
@@ -107,9 +113,9 @@ async function retryMissingBillsCalendar() {
 async function loadMonth(month: string, clock: SaoPauloClock) {
   const supabase = await createUserClient();
   const { data } = await supabase.auth.getUser();
-  if (!data.user) return {};
+  if (!data.user) return null;
   const repository = new SupabaseRepository(supabase);
-  return (await getMonth({ repository, clock }, data.user.id, month)).days;
+  return getMonth({ repository, clock }, data.user.id, month);
 }
 
 /** Estende a Janela de lembretes e retoma os pendentes. null = Usuário sem sessão ou falha inesperada. */

@@ -13,12 +13,12 @@ type Props = {
 
 function chipStyle(o: Occurrence, dayHasOverdue: boolean) {
   if (o.isOverdue) return "bg-danger text-white";
-  if (o.isPaid) return dayHasOverdue ? "bg-white text-[#3a3c3a] line-through" : "bg-surface2 text-muted line-through";
+  if (o.isPaid) return dayHasOverdue ? "bg-white text-[#3a3c3a] line-through dark:bg-surface2 dark:text-muted" : "bg-surface2 text-muted line-through";
   return "bg-lime text-limeink";
 }
 
 function dotStyle(o: Occurrence) {
-  if (o.isOverdue) return "bg-danger";
+  if (o.isOverdue) return "blink bg-danger";
   return o.isPaid ? "bg-muted/50" : "bg-brand";
 }
 
@@ -61,7 +61,7 @@ export function MonthCalendar({ month, today, selected, days }: Props) {
               <span className="hidden flex-col gap-0.5 sm:flex">
                 {occurrences.slice(0, 2).map((o) => (
                   <span
-                    key={o.billId + o.dueDate}
+                    key={o.billId + o.referenceMonth}
                     className={`truncate rounded-full px-2 py-0.5 text-[11px] font-semibold ${chipStyle(o, hasOverdue)}`}
                   >
                     {o.title}
@@ -74,7 +74,7 @@ export function MonthCalendar({ month, today, selected, days }: Props) {
               {/* Mobile: pontos. */}
               <span className="flex flex-wrap gap-[3px] sm:hidden" aria-hidden>
                 {occurrences.slice(0, 6).map((o) => (
-                  <i key={o.billId + o.dueDate} className={`size-1.5 rounded-full ${dotStyle(o)}`} />
+                  <i key={o.billId + o.referenceMonth} className={`size-1.5 rounded-full ${dotStyle(o)}`} />
                 ))}
               </span>
             </NavLink>

@@ -1,4 +1,4 @@
-import type { BillRule, Draft, Reminder } from "./domain";
+import type { BillRule, Draft, OccurrenceState, Reminder } from "./domain";
 
 export interface Repository {
   getBillsCalendarId(userId: string): Promise<string | null>;
@@ -11,12 +11,15 @@ export interface Repository {
   /** Salva a Conta (e a sua primeira revisão) e devolve o id. */
   saveBill(userId: string, rule: Omit<BillRule, "id">): Promise<string>;
   listBills(userId: string): Promise<BillRule[]>;
+  listOccurrenceStates(userId: string): Promise<OccurrenceState[]>;
+  /** Grava (ou troca) o estado do Vencimento. */
+  saveOccurrenceState(userId: string, state: OccurrenceState): Promise<void>;
   listReminders(userId: string): Promise<Reminder[]>;
   saveReminders(userId: string, reminders: Omit<Reminder, "id">[]): Promise<Reminder[]>;
   updateReminder(
     userId: string,
     id: string,
-    patch: Partial<Pick<Reminder, "syncStatus" | "googleEventId" | "lastError">>,
+    patch: Partial<Pick<Reminder, "syncStatus" | "googleEventId" | "lastError" | "paid" | "amount">>,
   ): Promise<void>;
   deleteReminder(userId: string, id: string): Promise<void>;
   /** true quando o Google recusou a autenticação e o Usuário precisa reconectar. */
@@ -32,8 +35,8 @@ export type ReminderEvent = {
   start: string;
   end: string;
   timeZone: string;
-  /** Minutos antes do início em que o pop-up dispara. */
-  popupMinutesBefore: number;
+  /** Minutos antes do início em que o pop-up dispara; null = sem notificação. */
+  popupMinutesBefore: number | null;
 };
 
 /** O Google recusou a autenticação (token revogado ou expirado): o Usuário precisa reconectar. */

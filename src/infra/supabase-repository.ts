@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { BillRule, Recurrence, Reminder, ReminderSyncStatus, Tag } from "@/core/domain";
+import type { BillRule, OccurrenceState, Recurrence, Reminder, ReminderSyncStatus, Tag } from "@/core/domain";
 import type { Repository } from "@/core/ports";
 
 export class SupabaseRepository implements Repository {
@@ -78,10 +78,41 @@ export class SupabaseRepository implements Repository {
     });
   }
 
+  async listOccurrenceStates(userId: string) {
+    const { data, error } = await this.client
+      .from("occurrence_states")
+      .select("bill_id, reference_month, is_paid, amount")
+      .eq("user_id", userId);
+    if (error) throw error;
+    return (data ?? []).map(
+      (row): OccurrenceState => ({
+        billId: row.bill_id,
+        referenceMonth: row.reference_month,
+        isPaid: row.is_paid,
+        ...(row.amount !== null && { amount: Number(row.amount) }),
+      }),
+    );
+  }
+
+  async saveOccurrenceState(userId: string, state: OccurrenceState) {
+    const { error } = await this.client.from("occurrence_states").upsert(
+      {
+        user_id: userId,
+        bill_id: state.billId,
+        reference_month: state.referenceMonth,
+        is_paid: state.isPaid,
+        amount: state.amount ?? null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "bill_id,reference_month" },
+    );
+    if (error) throw error;
+  }
+
   async listReminders(userId: string) {
     const { data, error } = await this.client
       .from("reminders")
-      .select("id, bill_id, reference_month, effective_date, title, amount, tags, sync_status, google_event_id, last_error")
+      .select("id, bill_id, reference_month, effective_date, title, amount, tags, paid, sync_status, google_event_id, last_error")
       .eq("user_id", userId)
       .order("effective_date");
     if (error) throw error;
@@ -93,6 +124,7 @@ export class SupabaseRepository implements Repository {
         effectiveDate: row.effective_date,
         title: row.title,
         tags: row.tags as Tag[],
+        paid: row.paid,
         syncStatus: row.sync_status as ReminderSyncStatus,
         ...(row.amount !== null && { amount: Number(row.amount) }),
         ...(row.google_event_id !== null && { googleEventId: row.google_event_id }),
@@ -114,6 +146,7 @@ export class SupabaseRepository implements Repository {
           title: r.title,
           amount: r.amount ?? null,
           tags: r.tags,
+          paid: r.paid,
           sync_status: r.syncStatus,
           google_event_id: r.googleEventId ?? null,
           last_error: r.lastError ?? null,
@@ -129,12 +162,14 @@ export class SupabaseRepository implements Repository {
   async updateReminder(
     userId: string,
     id: string,
-    patch: Partial<Pick<Reminder, "syncStatus" | "googleEventId" | "lastError">>,
+    patch: Partial<Pick<Reminder, "syncStatus" | "googleEventId" | "lastError" | "paid" | "amount">>,
   ) {
     const columns: Record<string, unknown> = {};
     if ("syncStatus" in patch) columns.sync_status = patch.syncStatus;
     if ("googleEventId" in patch) columns.google_event_id = patch.googleEventId ?? null;
     if ("lastError" in patch) columns.last_error = patch.lastError ?? null;
+    if ("paid" in patch) columns.paid = patch.paid;
+    if ("amount" in patch) columns.amount = patch.amount ?? null;
     const { error } = await this.client.from("reminders").update(columns).eq("user_id", userId).eq("id", id);
     if (error) throw error;
   }

@@ -53,6 +53,16 @@ export type Occurrence = {
   isOverdue: boolean;
 };
 
+/** O que o Usuário decidiu sobre um Vencimento: Pago ou não, e o valor realmente pago. Sobrepõe o que a regra da Conta diz. */
+export type OccurrenceState = {
+  billId: string;
+  /** `YYYY-MM` do Vencimento. */
+  referenceMonth: string;
+  isPaid: boolean;
+  /** Valor pago; passa a ser o Valor do Vencimento. */
+  amount?: number;
+};
+
 /** O que a IA extrai de um Comando de cadastro. Tudo que a Prévia mostra nasce daqui. */
 export type Draft = {
   title: string;
@@ -98,6 +108,8 @@ export type Reminder = {
   title: string;
   amount?: number;
   tags: Tag[];
+  /** O Vencimento está Pago: o título ganha "✅ " e a notificação some. */
+  paid: boolean;
   syncStatus: ReminderSyncStatus;
   /** Id do evento no Google; ausente até a criação dar certo. */
   googleEventId?: string;

@@ -5,6 +5,8 @@ import { SaoPauloClock } from "@/core/clock";
 import { confirmPreview, correctPreview, interpretCommand } from "@/core/commands";
 import type { ConfirmResult, PreviewResult } from "@/core/commands";
 import type { Preview } from "@/core/domain";
+import { togglePaid } from "@/core/payments";
+import type { TogglePaidInput, TogglePaidResult } from "@/core/payments";
 import { syncOnAppOpen } from "@/core/reminders";
 import type { SyncStatus } from "@/core/reminders";
 import { appUrl } from "@/infra/app-url";
@@ -71,5 +73,23 @@ export async function retryRemindersAction(): Promise<SyncStatus | { error: "una
   } catch (e) {
     console.error("Falha ao sincronizar os Lembretes", e);
     return { error: "unavailable" };
+  }
+}
+
+/** O check do Vencimento: marca ou desmarca como Pago, com o valor pago opcional. */
+export async function togglePaidAction(input: TogglePaidInput): Promise<TogglePaidResult | { ok: false; error: "unavailable" }> {
+  const { userId, deps } = await context();
+  try {
+    const result = await togglePaid(deps, userId, {
+      billId: String(input.billId),
+      referenceMonth: String(input.referenceMonth),
+      paid: input.paid === true,
+      ...(typeof input.amount === "number" && { amount: input.amount }),
+    });
+    revalidatePath("/");
+    return result;
+  } catch (e) {
+    console.error("Falha ao marcar o Vencimento", e);
+    return { ok: false, error: "unavailable" };
   }
 }
