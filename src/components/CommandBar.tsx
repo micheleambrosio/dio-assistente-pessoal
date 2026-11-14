@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { confirmPreviewAction, correctPreviewAction, interpretCommandAction } from "@/app/actions";
 import type { Preview } from "@/core/domain";
+import { Spinner } from "./Spinner";
 import { RECURRENCE_LABELS, TAG_LABELS, formatDate, formatMoney } from "@/lib/labels";
 
 const ERRORS = {
@@ -20,6 +21,7 @@ export function CommandBar() {
   const [correcting, setCorrecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [busyLabel, setBusyLabel] = useState("");
 
   function show(result: Awaited<ReturnType<typeof interpretCommandAction>>) {
     if (result.ok) {
@@ -41,6 +43,7 @@ export function CommandBar() {
     e.preventDefault();
     const value = text.trim();
     if (!value || pending) return;
+    setBusyLabel(preview && correcting ? "Corrigindo a Prévia…" : "Entendendo o Comando…");
     startTransition(async () => {
       if (preview && correcting) {
         show(await correctPreviewAction(preview, value));
@@ -54,6 +57,7 @@ export function CommandBar() {
 
   function confirm() {
     if (!preview) return;
+    setBusyLabel("Salvando a Conta e criando os lembretes…");
     startTransition(async () => {
       const result = await confirmPreviewAction(preview);
       if (!result.ok) return setError(ERRORS[result.error]);
@@ -73,13 +77,19 @@ export function CommandBar() {
           {error}
         </p>
       )}
+      {pending && (
+        <p className="pointer-events-auto flex w-full max-w-[640px] items-center gap-2 rounded-[22px] bg-surface px-4 py-3 text-sm text-muted">
+          <Spinner label={busyLabel} />
+          <span aria-hidden="true">{busyLabel}</span>
+        </p>
+      )}
       {preview && (
         <div className="pointer-events-auto w-full max-w-[640px]">
           <PreviewCard preview={preview} />
           {showingPreview && (
             <div className="mt-2 flex gap-2">
               <button onClick={confirm} disabled={pending} className={`${pill} bg-lime text-limeink hover:brightness-95`}>
-                Confirmar
+                {pending ? "Salvando…" : "Confirmar"}
               </button>
               <button onClick={() => setCorrecting(true)} disabled={pending} className={`${pill} bg-surface2 text-ink`}>
                 Corrigir
@@ -116,7 +126,7 @@ export function CommandBar() {
               text.trim() ? "bg-lime text-limeink" : "bg-surface2 text-muted"
             }`}
           >
-            {pending ? "…" : "↑"}
+            {pending ? <Spinner label="Enviando" /> : "↑"}
           </button>
         </form>
       )}

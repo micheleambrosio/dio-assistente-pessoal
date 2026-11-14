@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { AccountMenu } from "@/components/AccountMenu";
 import { CommandBar } from "@/components/CommandBar";
 import { DayTimeline } from "@/components/DayTimeline";
 import { MonthCalendar } from "@/components/MonthCalendar";
+import { MonthNav } from "@/components/MonthNav";
+import { MonthSkeleton } from "@/components/MonthSkeleton";
 import { PendingRemindersNotice } from "@/components/PendingRemindersNotice";
 import { SaoPauloClock } from "@/core/clock";
 import { getMonth } from "@/core/commands";
@@ -21,49 +24,63 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
   const month = isMonth(m) ? m : clock.currentMonth();
   const { name, year } = monthLabel(month);
 
-  const calendarFailed = await retryMissingBillsCalendar();
-  const sync = await syncReminders(clock);
-  const days = await loadMonth(month, clock);
-  const today = clock.today();
-  const selected = d?.startsWith(month) && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : today.startsWith(month) ? today : `${month}-01`;
-
-  const nav = "hairline inline-flex size-10 items-center justify-center rounded-full bg-surface font-semibold text-ink transition hover:bg-soft";
-
   return (
     <>
       <main className="mx-auto flex min-h-dvh max-w-[1200px] flex-col gap-4 px-4 pt-14 pb-44 sm:px-6">
-        {calendarFailed && (
-          <p role="alert" className="rounded-[22px] bg-surface px-4 py-3 text-sm">
-            Não conseguimos criar a agenda &quot;Contas do mês&quot; no seu Google Calendar.{" "}
-            <Link href="/login" className="font-semibold underline">Entre de novo com o Google</Link> e, na tela de consentimento, marque a permissão do Google Calendar.
-          </p>
-        )}
-        {sync?.accessRevoked && (
-          <p role="alert" className="rounded-[22px] bg-surface px-4 py-3 text-sm">
-            O Google recusou o acesso à sua agenda, e os lembretes estão parados.{" "}
-            <Link href="/login" className="font-semibold underline">Reconecte a sua conta Google</Link> para enviá-los.
-          </p>
-        )}
-        {sync && !sync.accessRevoked && sync.pendingCount > 0 && <PendingRemindersNotice count={sync.pendingCount} />}
+        {/* Falar com o Google demora: os avisos chegam depois, sem segurar o mês. */}
+        <Suspense fallback={null}>
+          <Notices clock={clock} />
+        </Suspense>
         <header className="flex flex-wrap items-end justify-between gap-3">
           <h1 className="display text-[clamp(52px,11vw,120px)] uppercase">
             {name} <span className="ml-1 text-[0.4em] text-muted">{year}</span>
           </h1>
           <div className="flex items-center gap-2">
-            <nav aria-label="Navegação de mês" className="flex items-center gap-2">
-              <Link href={`/?m=${shiftMonth(month, -1)}`} className={nav} aria-label="Mês anterior">←</Link>
-              <Link href="/" className="rounded-full px-3 py-2 text-xs font-semibold text-ink underline">Hoje</Link>
-              <Link href={`/?m=${shiftMonth(month, 1)}`} className={nav} aria-label="Próximo mês">→</Link>
-            </nav>
+            <MonthNav previous={shiftMonth(month, -1)} next={shiftMonth(month, 1)} />
             <AccountMenu />
           </div>
         </header>
-        <MonthCalendar month={month} today={today} selected={selected} days={days} />
-        <div className="mt-1">
-          <DayTimeline date={selected} today={today} occurrences={days[selected] ?? []} />
-        </div>
+        <Suspense key={month} fallback={<MonthSkeleton />}>
+          <MonthBody month={month} day={d} clock={clock} />
+        </Suspense>
       </main>
       <CommandBar />
+    </>
+  );
+}
+
+async function MonthBody({ month, day, clock }: { month: string; day?: string; clock: SaoPauloClock }) {
+  const days = await loadMonth(month, clock);
+  const today = clock.today();
+  const selected = day?.startsWith(month) && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : today.startsWith(month) ? today : `${month}-01`;
+  return (
+    <>
+      <MonthCalendar month={month} today={today} selected={selected} days={days} />
+      <div className="mt-1">
+        <DayTimeline date={selected} today={today} occurrences={days[selected] ?? []} />
+      </div>
+    </>
+  );
+}
+
+async function Notices({ clock }: { clock: SaoPauloClock }) {
+  const calendarFailed = await retryMissingBillsCalendar();
+  const sync = await syncReminders(clock);
+  return (
+    <>
+      {calendarFailed && (
+        <p role="alert" className="rounded-[22px] bg-surface px-4 py-3 text-sm">
+          Não conseguimos criar a agenda &quot;Contas do mês&quot; no seu Google Calendar.{" "}
+          <Link href="/login" className="font-semibold underline">Entre de novo com o Google</Link> e, na tela de consentimento, marque a permissão do Google Calendar.
+        </p>
+      )}
+      {sync?.accessRevoked && (
+        <p role="alert" className="rounded-[22px] bg-surface px-4 py-3 text-sm">
+          O Google recusou o acesso à sua agenda, e os lembretes estão parados.{" "}
+          <Link href="/login" className="font-semibold underline">Reconecte a sua conta Google</Link> para enviá-los.
+        </p>
+      )}
+      {sync && !sync.accessRevoked && sync.pendingCount > 0 && <PendingRemindersNotice count={sync.pendingCount} />}
     </>
   );
 }
