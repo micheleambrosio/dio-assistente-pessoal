@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import { Providers } from "@/components/Providers";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "900"], variable: "--font-inter" });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" }); // fonte variável: todos os pesos
 
 export const metadata: Metadata = {
   title: "Contas do mês",

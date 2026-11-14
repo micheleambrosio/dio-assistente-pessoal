@@ -1,3 +1,5 @@
+import type { BillRule, Draft } from "./domain";
+
 export interface Repository {
   getBillsCalendarId(userId: string): Promise<string | null>;
   /**
@@ -6,6 +8,9 @@ export interface Repository {
    * concorrente guardou antes.
    */
   claimBillsCalendarId(userId: string, calendarId: string, replacing: string | null): Promise<string>;
+  /** Salva a Conta (e a sua primeira revisão) e devolve o id. */
+  saveBill(userId: string, rule: Omit<BillRule, "id">): Promise<string>;
+  listBills(userId: string): Promise<BillRule[]>;
 }
 
 export interface CalendarGateway {
@@ -16,12 +21,11 @@ export interface CalendarGateway {
   deleteBillsCalendar(userId: string, calendarId: string): Promise<void>;
 }
 
-export interface Preview {
-  summary: string;
-}
-
+/** Devolve null quando o Comando não foi entendido. */
 export interface CommandInterpreter {
-  interpret(userId: string, text: string): Promise<Preview>;
+  interpret(text: string, today: string): Promise<Draft | null>;
+  /** Aplica uma correção em linguagem natural ("não, é dia 16") ao que já foi entendido. */
+  correct(previous: Draft, correction: string, today: string): Promise<Draft | null>;
 }
 
 export interface Clock {
