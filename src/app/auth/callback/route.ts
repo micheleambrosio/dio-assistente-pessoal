@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     await saveRefreshToken(userId, session.provider_refresh_token);
   }
 
+  // Se a Agenda de contas falhar, a tela principal tenta de novo e avisa o Usuário.
   try {
     await ensureBillsCalendar(
       { repository: new SupabaseRepository(supabase), calendar: new GoogleCalendarGateway() },
@@ -29,7 +30,6 @@ export async function GET(request: NextRequest) {
     );
   } catch (e) {
     console.error("Falha ao garantir a Agenda de contas", e);
-    return NextResponse.redirect(`${origin}/login?error=calendar`);
   }
 
   return NextResponse.redirect(`${origin}/`);

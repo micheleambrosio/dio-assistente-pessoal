@@ -18,9 +18,11 @@ async function accessTokenFor(userId: string) {
   return (await res.json()).access_token as string;
 }
 
+const CALENDARS_URL = "https://www.googleapis.com/calendar/v3/calendars";
+
 export class GoogleCalendarGateway implements CalendarGateway {
   async createBillsCalendar(userId: string, name: string) {
-    const res = await fetch("https://www.googleapis.com/calendar/v3/calendars", {
+    const res = await fetch(CALENDARS_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${await accessTokenFor(userId)}`,
@@ -30,5 +32,24 @@ export class GoogleCalendarGateway implements CalendarGateway {
     });
     if (!res.ok) throw new Error(`Falha ao criar a agenda no Google (${res.status})`);
     return (await res.json()).id as string;
+  }
+
+  async billsCalendarExists(userId: string, calendarId: string) {
+    const res = await fetch(`${CALENDARS_URL}/${encodeURIComponent(calendarId)}`, {
+      headers: { Authorization: `Bearer ${await accessTokenFor(userId)}` },
+    });
+    if (res.status === 404 || res.status === 410) return false;
+    if (!res.ok) throw new Error(`Falha ao consultar a agenda no Google (${res.status})`);
+    return true;
+  }
+
+  async deleteBillsCalendar(userId: string, calendarId: string) {
+    const res = await fetch(`${CALENDARS_URL}/${encodeURIComponent(calendarId)}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${await accessTokenFor(userId)}` },
+    });
+    if (!res.ok && res.status !== 404 && res.status !== 410) {
+      throw new Error(`Falha ao apagar a agenda no Google (${res.status})`);
+    }
   }
 }

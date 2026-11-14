@@ -6,10 +6,22 @@ export async function ensureBillsCalendar(
   deps: { repository: Repository; calendar: CalendarGateway },
   userId: string,
 ): Promise<string> {
-  const existing = await deps.repository.getBillsCalendarId(userId);
-  if (existing) return existing;
+  const { repository, calendar } = deps;
 
-  const id = await deps.calendar.createBillsCalendar(userId, BILLS_CALENDAR_NAME);
-  await deps.repository.saveBillsCalendarId(userId, id);
-  return id;
+  const stored = await repository.getBillsCalendarId(userId);
+  if (stored && (await calendar.billsCalendarExists(userId, stored))) return stored;
+
+  const created = await calendar.createBillsCalendar(userId, BILLS_CALENDAR_NAME);
+
+  let winner: string;
+  try {
+    winner = await repository.claimBillsCalendarId(userId, created, stored);
+  } catch (error) {
+    await calendar.deleteBillsCalendar(userId, created).catch(() => {});
+    throw error;
+  }
+
+  // Outra chamada concorrente guardou o id primeiro: a nossa agenda é sobra.
+  if (winner !== created) await calendar.deleteBillsCalendar(userId, created);
+  return winner;
 }

@@ -1,11 +1,19 @@
 export interface Repository {
   getBillsCalendarId(userId: string): Promise<string | null>;
-  saveBillsCalendarId(userId: string, calendarId: string): Promise<void>;
+  /**
+   * Guarda `calendarId` só se o id atual ainda for `replacing` (null = nenhum).
+   * Devolve o id vencedor: o próprio `calendarId`, ou o que outra chamada
+   * concorrente guardou antes.
+   */
+  claimBillsCalendarId(userId: string, calendarId: string, replacing: string | null): Promise<string>;
 }
 
 export interface CalendarGateway {
   /** Cria a BillsCalendar no Google Calendar do Usuário e devolve o id dela. */
   createBillsCalendar(userId: string, name: string): Promise<string>;
+  /** false quando o Usuário apagou a agenda no Google. */
+  billsCalendarExists(userId: string, calendarId: string): Promise<boolean>;
+  deleteBillsCalendar(userId: string, calendarId: string): Promise<void>;
 }
 
 export interface Preview {

@@ -5,7 +5,7 @@ Next.js (App Router) + TypeScript, Supabase, Tailwind e Ant Design. Ver `CLAUDE.
 ## Rodar
 
 1. `pnpm install`
-2. Copie `.env.example` para `.env.local` e preencha.
+2. Copie `.env.example` para `.env.local` e preencha (inclusive `NEXT_PUBLIC_SITE_URL`).
 3. Aplique `supabase/migrations/` no projeto Supabase.
 4. No Supabase, habilite o provedor Google (Client ID/Secret do Google Cloud) e adicione `<site>/auth/callback` aos redirects. No Google Cloud, habilite a Calendar API e o escopo `calendar.app.created`.
 5. `pnpm dev`

@@ -14,10 +14,22 @@ export class SupabaseRepository implements Repository {
     return data?.bills_calendar_id ?? null;
   }
 
-  async saveBillsCalendarId(userId: string, calendarId: string) {
-    const { error } = await this.client
-      .from("user_settings")
-      .upsert({ user_id: userId, bills_calendar_id: calendarId });
-    if (error) throw error;
+  async claimBillsCalendarId(userId: string, calendarId: string, replacing: string | null) {
+    if (replacing === null) {
+      // Atômico: só a primeira inserção vence (user_id é chave primária).
+      const { error } = await this.client
+        .from("user_settings")
+        .upsert({ user_id: userId, bills_calendar_id: calendarId }, { onConflict: "user_id", ignoreDuplicates: true });
+      if (error) throw error;
+    } else {
+      // Compare-and-set: só troca se o id ainda for o que lemos.
+      const { error } = await this.client
+        .from("user_settings")
+        .update({ bills_calendar_id: calendarId })
+        .eq("user_id", userId)
+        .eq("bills_calendar_id", replacing);
+      if (error) throw error;
+    }
+    return (await this.getBillsCalendarId(userId)) ?? calendarId;
   }
 }

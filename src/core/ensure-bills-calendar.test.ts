@@ -37,3 +37,48 @@ describe("ensureBillsCalendar em logins seguintes", () => {
     expect(a).not.toBe(b);
   });
 });
+
+describe("ensureBillsCalendar sob concorrência e falhas", () => {
+  it("dois logins simultâneos terminam com uma única agenda no Google", async () => {
+    const repository = new InMemoryRepository();
+    const calendar = new FakeCalendarGateway();
+    const deps = { repository, calendar };
+
+    const [a, b] = await Promise.all([
+      ensureBillsCalendar(deps, "user-1"),
+      ensureBillsCalendar(deps, "user-1"),
+    ]);
+
+    expect(a).toBe(b);
+    expect(await repository.getBillsCalendarId("user-1")).toBe(a);
+    expect(calendar.existingIds()).toEqual([a]);
+  });
+
+  it("se não conseguir guardar o id, apaga a agenda que acabou de criar e propaga o erro", async () => {
+    class FailingRepository extends InMemoryRepository {
+      async claimBillsCalendarId(): Promise<string> {
+        throw new Error("banco fora do ar");
+      }
+    }
+    const calendar = new FakeCalendarGateway();
+
+    await expect(
+      ensureBillsCalendar({ repository: new FailingRepository(), calendar }, "user-1"),
+    ).rejects.toThrow("banco fora do ar");
+    expect(calendar.existingIds()).toEqual([]);
+  });
+
+  it("recria a agenda quando o Usuário a apagou no Google (ADR 0003)", async () => {
+    const repository = new InMemoryRepository();
+    const calendar = new FakeCalendarGateway();
+    const deps = { repository, calendar };
+
+    const first = await ensureBillsCalendar(deps, "user-1");
+    calendar.deleteExternally(first);
+    const second = await ensureBillsCalendar(deps, "user-1");
+
+    expect(second).not.toBe(first);
+    expect(await repository.getBillsCalendarId("user-1")).toBe(second);
+    expect(calendar.existingIds()).toEqual([second]);
+  });
+});

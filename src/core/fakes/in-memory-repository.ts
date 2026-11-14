@@ -7,7 +7,10 @@ export class InMemoryRepository implements Repository {
     return this.billsCalendarIds.get(userId) ?? null;
   }
 
-  async saveBillsCalendarId(userId: string, calendarId: string) {
+  async claimBillsCalendarId(userId: string, calendarId: string, replacing: string | null) {
+    const current = this.billsCalendarIds.get(userId) ?? null;
+    if (current !== replacing) return current!;
     this.billsCalendarIds.set(userId, calendarId);
+    return calendarId;
   }
 }

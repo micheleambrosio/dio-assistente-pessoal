@@ -6,8 +6,15 @@ describe("InMemoryRepository", () => {
   it("devolve null para um Usuário sem agenda e o id depois de salvo", async () => {
     const repository = new InMemoryRepository();
     expect(await repository.getBillsCalendarId("u")).toBeNull();
-    await repository.saveBillsCalendarId("u", "cal");
+    expect(await repository.claimBillsCalendarId("u", "cal", null)).toBe("cal");
     expect(await repository.getBillsCalendarId("u")).toBe("cal");
+  });
+
+  it("não sobrescreve quando o id atual não é o esperado e devolve o vencedor", async () => {
+    const repository = new InMemoryRepository();
+    await repository.claimBillsCalendarId("u", "primeira", null);
+    expect(await repository.claimBillsCalendarId("u", "segunda", null)).toBe("primeira");
+    expect(await repository.claimBillsCalendarId("u", "terceira", "primeira")).toBe("terceira");
   });
 });
 
