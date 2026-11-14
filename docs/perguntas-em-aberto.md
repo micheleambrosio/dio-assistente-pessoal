@@ -14,3 +14,15 @@ Já sabemos:
 - Responsivo, com light mode e dark mode.
 
 Falta decidir: disposição dos elementos (calendário × lista × entrada de texto/voz), comportamento no mobile, onde fica a entrada de cadastro, como o destaque dos dias aparece, e o catálogo de animações.
+
+### Decisão (protótipo em `prototipo-tela-principal/`): variação B, "Agenda"
+
+Escolhida entre três variações (A Painel, B Agenda, C Resumo primeiro). Ajustes pedidos sobre a B:
+
+- **Comando sempre visível:** a entrada de texto/voz fica fixa e aberta no rodapé, sem botão para escondê-la.
+- **Lista do dia na linha do tempo da C:** os Vencimentos do dia usam o componente da C, em que o destaque dos Pagos é mais forte.
+- **Verdes:** testamos uma versão menos saturada e voltamos aos verdes originais do Design.md da Wise (lime `#9fe870`, forest `#163300`).
+
+Layout: Resumo do mês em faixa de 4 números no topo, Calendário em largura total com títulos nas células (desktop) ou pontos (mobile), lista do dia abaixo do Calendário, Atrasadas no topo da lista.
+
+**Ainda em aberto:** o catálogo final de animações. O motivo da escolha foi inferido do pedido e precisa da sua confirmação.
