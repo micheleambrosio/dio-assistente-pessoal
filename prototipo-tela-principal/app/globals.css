@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/* Tokens do DESIGN.md (Wise). Dark mode = inversão forest/lime. */
+:root {
+  --bg: #ffffff; --surface: #f4f6f2; --surface-2: #e8ebe6; --ink: #0e0f0c; --text: #454745; --muted: #868685;
+  --brand: #163300; --lime: #9fe870; --lime-ink: #163300; --soft: #e2f6d5; --soft-ink: #163300;
+  --late: #8f2228; --danger: #cb272f; --danger-soft: #fbe3e4; --line: rgba(14,15,12,.12); --dark-card: #163300; --dark-card-ink: #9fe870;
+  --shadow-lg: 0 6px 20px rgba(0,0,0,.08); --shadow-xl: 0 10px 32px rgba(0,0,0,.15), 0 40px 40px rgba(0,0,0,.04);
+}
+html[data-theme="dark"] {
+  --bg: #0b0f08; --surface: #121a0c; --surface-2: #1b2813; --ink: #f4f8ef; --text: #c9d1c2; --muted: #8b9684;
+  --brand: #9fe870; --lime: #9fe870; --lime-ink: #163300; --soft: #1f3a0f; --soft-ink: #cdf3b4;
+  --late: #6e1f24; --danger: #ff6b70; --danger-soft: #3a1618; --line: rgba(244,248,239,.14); --dark-card: #163300; --dark-card-ink: #9fe870;
+  --shadow-lg: 0 6px 20px rgba(0,0,0,.5); --shadow-xl: 0 10px 32px rgba(0,0,0,.6);
+}
+@theme inline {
+  --color-bg: var(--bg); --color-surface: var(--surface); --color-surface2: var(--surface-2); --color-ink: var(--ink);
+  --color-body: var(--text); --color-muted: var(--muted); --color-brand: var(--brand); --color-lime: var(--lime);
+  --color-limeink: var(--lime-ink); --color-soft: var(--soft); --color-softink: var(--soft-ink); --color-danger: var(--danger);
+  --color-dangersoft: var(--danger-soft); --color-late: var(--late); --color-line: var(--line); --color-dark: var(--dark-card); --color-darkink: var(--dark-card-ink);
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+}
+html, body { background: var(--bg); color: var(--text); font-family: var(--font-sans); letter-spacing: -0.006em; transition: background .3s, color .3s; }
+button { cursor: pointer; }
+/* "Wise Sans" substituída por Inter Black -0.04em (conforme DESIGN.md) */
+.display { font-weight: 900; letter-spacing: -0.04em; line-height: .9; color: var(--ink); }
+.pill { border-radius: 9999px; }
+.card { background: var(--surface); border-radius: 28px; }
+.hairline { box-shadow: 0 0 0 1px var(--line); }
+.safe-bottom { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+
+@keyframes pulse-ring { 0% { transform: scale(1); opacity: .55; } 100% { transform: scale(2.3); opacity: 0; } }
+@keyframes wave { 0%,100% { transform: scaleY(.25); } 50% { transform: scaleY(1); } }
+@keyframes blink-dot { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes float-y { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.pulse-ring { animation: pulse-ring 1.6s ease-out infinite; }
+.wave-bar { transform-origin: center; animation: wave 1s ease-in-out infinite; }
+.blink { animation: blink-dot 1.2s ease-in-out infinite; }
+.float-y { animation: float-y 3s ease-in-out infinite; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+@media (prefers-reduced-motion: reduce) { .pulse-ring,.wave-bar,.blink,.float-y { animation: none; } }
+
+/* conta Paga dentro de dia vermelho (light): fundo branco, texto cinza escuro */
+html:not([data-theme="dark"]) .paga-no-vermelho { background: #fff; color: #3a3c3a; }
+html[data-theme="dark"] .paga-no-vermelho { background: var(--surface-2); color: var(--muted); }
